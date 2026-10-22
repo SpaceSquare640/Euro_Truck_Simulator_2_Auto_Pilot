@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Edited by: OpenAI-Codex_Responsible: Source_Code",
+  "title": "ETS2AP UI IPC v1 message",
+  "description": "One decoded JSON message after the 4-byte little-endian frame length.",
+  "oneOf": [
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/getStatus" },
+    { "$ref": "#/$defs/setConfig" },
+    { "$ref": "#/$defs/engage" },
+    { "$ref": "#/$defs/disengage" },
+    { "$ref": "#/$defs/helloAck" },
+    { "$ref": "#/$defs/status" },
+    { "$ref": "#/$defs/configMessage" },
+    { "$ref": "#/$defs/log" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["type", "version", "id", "timestamp", "payload"],
+      "properties": {
+        "type": { "type": "string" },
+        "version": { "type": "string", "pattern": "^1[.][0-9]+$" },
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
+        "timestamp": { "$ref": "#/$defs/uint64Decimal" },
+        "payload": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "uint64Decimal": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 20
+    },
+    "versionString": {
+      "type": "string",
+      "pattern": "^[0-9]+[.][0-9]+$"
+    },
+    "emptyPayload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "GAME_NOT_RUNNING",
+        "TELEMETRY_UNAVAILABLE",
+        "TELEMETRY_STALE",
+        "CONTROL_UNAVAILABLE",
+        "MANUAL_OVERRIDE",
+        "COMMAND_TIMEOUT",
+        "INVALID_CONFIG",
+        "UNSUPPORTED_VERSION",
+        "MALFORMED_MESSAGE",
+        "INTERNAL_ERROR"
+      ]
+    },
+    "nullableNonnegative": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "telemetrySummary": {
+      "type": "object",
+      "required": [
+        "speed_mps",
+        "speed_limit_mps",
+        "navigation_distance_m",
+        "telemetry_age_s"
+      ],
+      "properties": {
+        "speed_mps": { "$ref": "#/$defs/nullableNonnegative" },
+        "speed_limit_mps": { "$ref": "#/$defs/nullableNonnegative" },
+        "navigation_distance_m": { "$ref": "#/$defs/nullableNonnegative" },
+        "telemetry_age_s": { "$ref": "#/$defs/nullableNonnegative" }
+      },
+      "additionalProperties": true
+    },
+    "config": {
+      "type": "object",
+      "required": ["target_speed_mps"],
+      "properties": {
+        "target_speed_mps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 40
+        }
+      },
+      "additionalProperties": true
+    },
+    "hello": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "hello" },
+            "payload": {
+              "type": "object",
+              "required": ["supported_versions"],
+              "properties": {
+                "supported_versions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "$ref": "#/$defs/versionString" }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "getStatus": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "get_status" },
+            "payload": { "$ref": "#/$defs/emptyPayload" }
+          }
+        }
+      ]
+    },
+    "setConfig": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "set_config" },
+            "payload": {
+              "type": "object",
+              "required": ["config"],
+              "properties": {
+                "config": { "$ref": "#/$defs/config" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "engage": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "engage" },
+            "payload": { "$ref": "#/$defs/emptyPayload" }
+          }
+        }
+      ]
+    },
+    "disengage": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "disengage" },
+            "payload": { "$ref": "#/$defs/emptyPayload" }
+          }
+        }
+      ]
+    },
+    "helloAck": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "hello_ack" },
+            "payload": {
+              "type": "object",
+              "required": ["selected_version"],
+              "properties": {
+                "selected_version": { "$ref": "#/$defs/versionString" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "status": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "status" },
+            "payload": {
+              "type": "object",
+              "required": ["state", "error_code", "telemetry"],
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "enum": ["offline", "ready", "engaged", "manual_override", "fault"]
+                },
+                "error_code": {
+                  "anyOf": [
+                    { "type": "null" },
+                    { "$ref": "#/$defs/errorCode" }
+                  ]
+                },
+                "telemetry": { "$ref": "#/$defs/telemetrySummary" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "configMessage": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "config" },
+            "payload": {
+              "type": "object",
+              "required": ["config"],
+              "properties": {
+                "config": { "$ref": "#/$defs/config" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "log": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "log" },
+            "payload": {
+              "type": "object",
+              "required": ["level", "message_key", "args"],
+              "properties": {
+                "level": {
+                  "type": "string",
+                  "enum": ["info", "warning", "error"]
+                },
+                "message_key": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_.]*$"
+                },
+                "args": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": ["string", "number", "boolean", "null"]
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+    "error": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "properties": {
+            "type": { "const": "error" },
+            "payload": {
+              "type": "object",
+              "required": ["code"],
+              "properties": {
+                "code": { "$ref": "#/$defs/errorCode" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    }
+  }
+}

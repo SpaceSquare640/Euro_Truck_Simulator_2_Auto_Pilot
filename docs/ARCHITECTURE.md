@@ -23,15 +23,14 @@ flowchart LR
 | `ui/` | C# .NET 10 WPF | Settings, status, start/stop, logs | Run the control loop |
 | `shared/` | Spec | Versioned IPC schemas | — |
 
-## IPC Contract (to be specified in `shared/`)
+## IPC Contract
 | Channel | Transport | Direction | Notes |
 |---|---|---|---|
-| `telemetry v1` | Shared memory | plugin → python | Fixed-layout struct, SI units, version header, sequence counter |
-| `control v1` | Named pipe | python → input | Steering [-1,1], throttle [0,1], brake [0,1], timestamp |
-| `ui v1` | Named pipe | python ↔ ui | JSON messages: status, config, commands |
+| [telemetry v1](../shared/ipc/telemetry.v1.md) | Shared memory | plugin → python | Fixed-layout struct, SI units, version header, sequence counter |
+| [control v1](../shared/ipc/control.v1.md) | Named pipe | python → input | Steering [-1,1], throttle [0,1], brake [0,1], timestamp |
+| [ui v1](../shared/ipc/ui.v1.md) | Named pipe | python ↔ ui | JSON messages: status, config, commands; [JSON Schema](../shared/ipc/ui.v1.schema.json) |
 
-Rules: every schema carries a version number; breaking changes bump the major version;
-units and update rates are defined in the spec, not in code comments.
+The [shared contract overview](../shared/README.md) defines versioning and common units. Channel specifications define field layout, update behavior, and safety rules.
 
 ## Safety
 - Driver override always wins; any manual input disengages autopilot.
@@ -43,3 +42,4 @@ units and update rates are defined in the spec, not in code comments.
 - CI: GitHub Actions `windows-latest`.
 
 <!-- Edited by: Anthropic-Claude_Code -->
+<!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
