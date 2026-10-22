@@ -43,6 +43,9 @@ and an in-browser simulator. All project READMEs link here.
 - License: CC BY-NC-SA 4.0, copyright Kingsley. Dependencies must be MIT / BSD / Apache-2.0 / ISC.
 
 ## Signature
-- Add `Edited by: OpenAI-Codex` in a comment for files you create or modify.
+- Add `Edited by: OpenAI-Codex_Responsible: Website` in a comment for files you create or modify.
+
+## Reporting
+- Every report must be a single copyable ```text block starting with `[REPORT] OpenAI-Codex_Responsible: Website`, with fields: Task, Status, Changed files, Commits, Verification, Issues / Questions.
 
 <!-- Edited by: Anthropic-Claude_Code -->
