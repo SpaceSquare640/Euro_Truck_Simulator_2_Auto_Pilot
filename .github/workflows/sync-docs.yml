@@ -1,0 +1,62 @@
+# Edited by: Anthropic-Claude_Code
+# Publishes Change Log.md to the website branch, then triggers the Pages deployment.
+# Pushes made with GITHUB_TOKEN do not trigger other workflows, so the deploy is dispatched explicitly.
+name: Sync Docs to Website
+
+on:
+  push:
+    branches: [Source_Code]
+    paths: ["Change Log.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-docs
+  cancel-in-progress: false
+
+env:
+  WEBSITE_BRANCH: Euro_Truck_Simulator_2_Auto_Pilot_Website
+  TARGET_PATH: src/content/changelog.md
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.WEBSITE_BRANCH }}
+          path: website
+      - name: Copy Change Log
+        run: |
+          mkdir -p "website/$(dirname "$TARGET_PATH")"
+          cp "source/Change Log.md" "website/$TARGET_PATH"
+      - name: Commit and push
+        id: push
+        working-directory: website
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$TARGET_PATH"
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "docs: sync Change Log from Source_Code@${GITHUB_SHA::7}"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Trigger Pages deployment
+        if: steps.push.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh workflow view pages.yml --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref "$WEBSITE_BRANCH"
+          else
+            echo "pages.yml not found yet; skipping deployment trigger."
+          fi

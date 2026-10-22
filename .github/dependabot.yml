@@ -1,0 +1,8 @@
+# Edited by: Anthropic-Claude_Code
+# Add pip / nuget ecosystems once python/ and ui/ manifests exist.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

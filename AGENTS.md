@@ -48,6 +48,9 @@ See `docs/ARCHITECTURE.md`. Modules talk only through the versioned IPC contract
 - App images, icons and Social Preview are produced by Codex and stored in `assets/`.
 
 ## Signature
-- Add `Edited by: OpenAI-Codex` in a comment or Change Log entry for files you create or modify.
+- Add `Edited by: OpenAI-Codex_Responsible: Source_Code` in a comment or Change Log entry for files you create or modify.
+
+## Reporting
+- Every report must be a single copyable ```text block starting with `[REPORT] OpenAI-Codex_Responsible: Source_Code`, with fields: Task, Status, Changed files, Commits, Verification, Issues / Questions.
 
 <!-- Edited by: Anthropic-Claude_Code -->

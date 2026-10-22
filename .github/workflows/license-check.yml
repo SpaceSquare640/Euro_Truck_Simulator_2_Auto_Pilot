@@ -1,0 +1,49 @@
+# Edited by: Anthropic-Claude_Code
+# Fails when a dependency uses a license outside the allow-list in CONTRIBUTING.md.
+name: License Check
+
+on:
+  push:
+    paths:
+      - "python/pyproject.toml"
+      - "python/requirements*.txt"
+      - "ui/**/*.csproj"
+      - "ui/**/Directory.Packages.props"
+      - ".github/workflows/license-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Skip if no Python project
+        id: has
+        shell: bash
+        run: echo "py=$([ -f python/pyproject.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - if: steps.has.outputs.py == 'true'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - if: steps.has.outputs.py == 'true'
+        working-directory: python
+        run: |
+          pip install .
+          pip install pip-licenses
+          pip-licenses --partial-match --allow-only="MIT;BSD;Apache;ISC;zlib;Python Software Foundation;Mozilla Public License 2.0"
+
+  dotnet:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: .NET license check (pending)
+        shell: bash
+        run: |
+          if ls ui/**/*.csproj >/dev/null 2>&1; then
+            echo "::warning::.NET dependency license check is not implemented yet. Review NuGet licenses manually."
+          else
+            echo "No .NET project; skipping."
+          fi
