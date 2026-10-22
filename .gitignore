@@ -1,0 +1,58 @@
+# Edited by: Anthropic-Claude_Code
+
+# --- Confidential: must never be committed ---
+.claude/
+Resource/
+*.env
+.env*
+*.pem
+*.key
+*.pfx
+
+# --- Build output ---
+build/
+out/
+dist/
+bin/
+obj/
+x64/
+x86/
+Debug/
+Release/
+*.dll
+*.exe
+*.pdb
+*.lib
+*.exp
+*.ilk
+
+# --- C++ / CMake / Visual Studio ---
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+.vs/
+*.user
+*.suo
+*.vcxproj.user
+ipch/
+
+# --- .NET ---
+*.nupkg
+packages/
+TestResults/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
