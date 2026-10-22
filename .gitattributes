@@ -1,0 +1,23 @@
+# Edited by: Anthropic-Claude_Code
+# Normalize line endings: LF in the repo, platform-specific where tools require it.
+* text=auto eol=lf
+
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+*.sln      text eol=crlf
+*.vcxproj  text eol=crlf
+*.vcxproj.filters text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.dll  binary
+*.exe  binary
+*.zip  binary
+*.ttf  binary
+*.woff binary
+*.woff2 binary
