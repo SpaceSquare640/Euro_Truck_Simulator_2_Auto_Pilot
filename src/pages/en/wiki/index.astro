@@ -1,0 +1,27 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../../../layouts/Base.astro";
+import { t } from "../../../i18n";
+
+const categories = [
+  { title: t("wiki.categoryOneTitle"), body: t("wiki.categoryOneBody") },
+  { title: t("wiki.categoryTwoTitle"), body: t("wiki.categoryTwoBody") },
+  { title: t("wiki.categoryThreeTitle"), body: t("wiki.categoryThreeBody") },
+  { title: t("wiki.categoryFourTitle"), body: t("wiki.categoryFourBody") },
+];
+---
+
+<Base title={t("wiki.title")} description={t("wiki.description")}>
+  <section aria-labelledby="wiki-heading">
+    <h1 class="page-heading" id="wiki-heading">{t("wiki.heading")}</h1>
+    <p class="page-intro">{t("wiki.intro")}</p>
+    <ul class="outline-list">
+      {categories.map((category) => (
+        <li>
+          <h2>{category.title}</h2>
+          <p>{category.body}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>

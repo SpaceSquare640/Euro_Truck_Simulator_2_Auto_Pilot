@@ -1,0 +1,54 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../../layouts/Base.astro";
+import { t } from "../../i18n";
+
+const baseUrl = import.meta.env.BASE_URL;
+const features = [
+  { title: t("home.featureOneTitle"), body: t("home.featureOneBody") },
+  { title: t("home.featureTwoTitle"), body: t("home.featureTwoBody") },
+  { title: t("home.featureThreeTitle"), body: t("home.featureThreeBody") },
+];
+const links = [
+  { title: t("home.docsCardTitle"), body: t("home.docsCardBody"), href: `${baseUrl}en/docs/` },
+  { title: t("home.changelogCardTitle"), body: t("home.changelogCardBody"), href: `${baseUrl}en/changelog/` },
+  { title: t("home.wikiCardTitle"), body: t("home.wikiCardBody"), href: `${baseUrl}en/wiki/` },
+  { title: t("home.simulatorCardTitle"), body: t("home.simulatorCardBody"), href: `${baseUrl}en/simulator/` },
+];
+---
+
+<Base title={t("home.title")} description={t("home.description")}>
+  <section class="hero" aria-labelledby="home-heading">
+    <p class="eyebrow">{t("home.eyebrow")}</p>
+    <h1 class="hero-heading" id="home-heading">{t("home.heading")}</h1>
+    <p class="hero-intro">{t("home.intro")}</p>
+    <div class="hero-actions">
+      <a class="button" href={`${baseUrl}en/docs/`}>{t("home.primaryAction")}</a>
+      <a class="button button-secondary" href={`${baseUrl}en/simulator/`}>{t("home.secondaryAction")}</a>
+    </div>
+  </section>
+
+  <section class="content-section" aria-labelledby="features-heading">
+    <h2 class="section-heading" id="features-heading">{t("home.featuresHeading")}</h2>
+    <div class="feature-grid">
+      {features.map((feature) => (
+        <article class="feature-card">
+          <h3>{feature.title}</h3>
+          <p>{feature.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="content-section" aria-labelledby="explore-heading">
+    <h2 class="section-heading" id="explore-heading">{t("home.exploreHeading")}</h2>
+    <div class="link-grid">
+      {links.map((link) => (
+        <article class="link-card">
+          <h3><a href={link.href}>{link.title}</a></h3>
+          <p>{link.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+</Base>

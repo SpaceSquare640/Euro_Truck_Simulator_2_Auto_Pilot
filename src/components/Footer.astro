@@ -1,0 +1,17 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import { t, type Locale } from "../i18n";
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = "en" } = Astro.props;
+---
+
+<footer class="site-footer">
+  <p>
+    {t("footer.copyrightPrefix", locale)}<a href={t("footer.licenseHref", locale)}>{t("footer.licenseName", locale)}</a>
+  </p>
+  <p>{t("footer.notAffiliated", locale)}</p>
+</footer>

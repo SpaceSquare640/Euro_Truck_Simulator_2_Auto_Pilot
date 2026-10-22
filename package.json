@@ -1,0 +1,19 @@
+{
+  "name": "ets2-auto-pilot-website",
+  "version": "0.1.0",
+  "private": true,
+  "license": "CC-BY-NC-SA-4.0",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "astro": "7.4.2",
+    "license-checker": "25.0.1",
+    "typescript": "6.0.3"
+  }
+}

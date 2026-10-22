@@ -1,0 +1,29 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../../../layouts/Base.astro";
+import { t } from "../../../i18n";
+
+const sections = [
+  { title: t("docs.sectionOneTitle"), body: t("docs.sectionOneBody") },
+  { title: t("docs.sectionTwoTitle"), body: t("docs.sectionTwoBody") },
+  { title: t("docs.sectionThreeTitle"), body: t("docs.sectionThreeBody") },
+  { title: t("docs.sectionFourTitle"), body: t("docs.sectionFourBody") },
+];
+---
+
+<Base title={t("docs.title")} description={t("docs.description")}>
+  <section aria-labelledby="docs-heading">
+    <p class="eyebrow">{t("docs.comingSoon")}</p>
+    <h1 class="page-heading" id="docs-heading">{t("docs.heading")}</h1>
+    <p class="page-intro">{t("docs.intro")}</p>
+    <ol class="outline-list">
+      {sections.map((section) => (
+        <li>
+          <h2>{section.title}</h2>
+          <p>{section.body}</p>
+          <span class="status-label">{t("docs.comingSoon")}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+</Base>

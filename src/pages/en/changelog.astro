@@ -1,0 +1,16 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../../layouts/Base.astro";
+import { Content } from "../../content/changelog.md";
+import { t } from "../../i18n";
+---
+
+<Base title={t("changelog.title")} description={t("changelog.description")}>
+  <section aria-labelledby="changelog-heading">
+    <h1 class="page-heading" id="changelog-heading">{t("changelog.heading")}</h1>
+    <p class="page-intro">{t("changelog.intro")}</p>
+    <article class="changelog-content">
+      <Content />
+    </article>
+  </section>
+</Base>

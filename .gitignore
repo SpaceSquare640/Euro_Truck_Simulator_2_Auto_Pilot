@@ -56,3 +56,10 @@ venv/
 .idea/
 Thumbs.db
 Desktop.ini
+
+# Astro site build output
+node_modules/
+dist/
+.astro/
+
+# Edited by: OpenAI-Codex_Responsible: Website

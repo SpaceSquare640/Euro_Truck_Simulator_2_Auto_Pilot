@@ -1,0 +1,20 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../../layouts/Base.astro";
+import { t } from "../../i18n";
+---
+
+<Base title={t("simulator.title")} description={t("simulator.description")}>
+  <section aria-labelledby="simulator-heading">
+    <h1 class="page-heading" id="simulator-heading">{t("simulator.heading")}</h1>
+    <p class="page-intro">{t("simulator.intro")}</p>
+    <div
+      class="simulator-placeholder"
+      data-island-placeholder="simulator"
+      role="status"
+      aria-label={t("simulator.placeholderLabel")}
+    >
+      <p>{t("simulator.placeholder")}</p>
+    </div>
+  </section>
+</Base>
