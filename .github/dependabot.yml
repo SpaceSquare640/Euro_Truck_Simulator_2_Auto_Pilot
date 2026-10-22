@@ -1,8 +1,14 @@
 # Edited by: Anthropic-Claude_Code
+# Edited by: OpenAI-Codex_Responsible: Source_Code
 # Add pip / nuget ecosystems once python/ and ui/ manifests exist.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /
+    target-branch: Euro_Truck_Simulator_2_Auto_Pilot_Website
     schedule:
       interval: weekly

@@ -9,6 +9,8 @@ All notable changes to this project are documented here and published on the pro
 - GitHub Actions: secret scan (gitleaks), CI (C++ / Python / .NET 10, auto-skip until modules exist), dependency license check, Change Log sync to website, release skeleton; Dependabot for Actions. (Anthropic-Claude_Code)
 - Versioned v1 IPC specifications for telemetry, control, and UI, including the UI JSON Schema. (OpenAI-Codex_Responsible: Source_Code)
 
+- Dependabot npm updates targeting the website branch. (OpenAI-Codex_Responsible: Source_Code)
+
 ### Changed
 - Agent signature in `AGENTS.md` set to `OpenAI-Codex_Responsible: Source_Code`; reporting format added. (Anthropic-Claude_Code)
 - Repository initialized: `.gitignore`, README, LICENSE (CC BY-NC-SA 4.0), NOTICE. (Anthropic-Claude_Code)
