@@ -1,0 +1,6 @@
+{
+  "default": "en",
+  "locales": [
+    { "code": "en", "htmlLang": "en", "autonym": "English", "script": "Latn", "enabled": true }
+  ]
+}

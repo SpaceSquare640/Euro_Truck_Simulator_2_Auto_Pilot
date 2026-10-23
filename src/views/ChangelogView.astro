@@ -1,0 +1,22 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import { Content } from "../content/changelog.md";
+import { t, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<Base title={t("changelog.title", locale)} description={t("changelog.description", locale)} locale={locale}>
+  <section aria-labelledby="changelog-heading">
+    <h1 class="page-heading" id="changelog-heading">{t("changelog.heading", locale)}</h1>
+    <p class="page-intro">{t("changelog.intro", locale)}</p>
+    <article class="changelog-content">
+      <Content />
+    </article>
+  </section>
+</Base>

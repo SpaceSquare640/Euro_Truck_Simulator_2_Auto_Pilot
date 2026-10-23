@@ -1,0 +1,28 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import { alternateLocales, t, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const alternates = alternateLocales(locale, Astro.url.pathname);
+---
+
+{alternates.length > 1 && (
+  <nav class="language-switcher" aria-label={t("language.navLabel", locale)}>
+    <ul>
+      {alternates.map((alternate) => (
+        <li>
+          <a
+            href={alternate.href}
+            lang={alternate.htmlLang}
+            hreflang={alternate.htmlLang}
+            aria-current={alternate.current ? "true" : undefined}
+          >{alternate.autonym}</a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+)}

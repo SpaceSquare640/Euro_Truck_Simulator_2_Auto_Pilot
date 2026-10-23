@@ -1,0 +1,42 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import { t, localePath, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const sections = [
+  { title: t("docs.overviewHeading", locale), body: t("docs.overviewBody", locale), state: t("label.planned", locale) },
+  { title: t("docs.requirementsHeading", locale), body: t("docs.requirementsBody", locale), state: t("label.planned", locale) },
+  { title: t("docs.installHeading", locale), body: t("docs.installBody", locale), state: t("label.notAvailable", locale) },
+  { title: t("docs.troubleshootingHeading", locale), body: t("docs.troubleshootingBody", locale), state: t("label.planned", locale) },
+];
+---
+
+<Base title={t("docs.title", locale)} description={t("docs.description", locale)} locale={locale}>
+  <section aria-labelledby="docs-heading">
+    <h1 class="page-heading" id="docs-heading">{t("docs.heading", locale)}</h1>
+    <p class="page-intro">{t("docs.intro", locale)}</p>
+    <ol class="outline-list">
+      {sections.map((section) => (
+        <li>
+          <h2>{section.title}</h2>
+          <p>{section.body}</p>
+          <span class="status-label">{section.state}</span>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="content-section" aria-labelledby="docs-more-heading">
+    <h2 class="section-heading" id="docs-more-heading">{t("docs.moreHeading", locale)}</h2>
+    <ul class="outline-list">
+      <li><a href={localePath(locale, "docs/architecture/")}>{t("docs.architectureLink", locale)}</a></li>
+      <li><a href={localePath(locale, "docs/status/")}>{t("docs.statusLink", locale)}</a></li>
+    </ul>
+  </section>
+</Base>

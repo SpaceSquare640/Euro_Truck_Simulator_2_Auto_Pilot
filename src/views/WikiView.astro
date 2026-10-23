@@ -1,0 +1,33 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import { t, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const categories = [
+  { title: t("wiki.categoryOneTitle", locale), body: t("wiki.categoryOneBody", locale) },
+  { title: t("wiki.categoryTwoTitle", locale), body: t("wiki.categoryTwoBody", locale) },
+  { title: t("wiki.categoryThreeTitle", locale), body: t("wiki.categoryThreeBody", locale) },
+  { title: t("wiki.categoryFourTitle", locale), body: t("wiki.categoryFourBody", locale) },
+];
+---
+
+<Base title={t("wiki.title", locale)} description={t("wiki.description", locale)} locale={locale}>
+  <section aria-labelledby="wiki-heading">
+    <h1 class="page-heading" id="wiki-heading">{t("wiki.heading", locale)}</h1>
+    <p class="page-intro">{t("wiki.intro", locale)}</p>
+    <ul class="outline-list">
+      {categories.map((category) => (
+        <li>
+          <h2>{category.title}</h2>
+          <p>{category.body}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>

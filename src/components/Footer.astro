@@ -1,12 +1,12 @@
 ---
 // Edited by: OpenAI-Codex_Responsible: Website
-import { t, type Locale } from "../i18n";
+import { localePath, t, type Locale } from "../i18n";
 
 interface Props {
-  locale?: Locale;
+  locale: Locale;
 }
 
-const { locale = "en" } = Astro.props;
+const { locale } = Astro.props;
 ---
 
 <footer class="site-footer">
@@ -15,6 +15,6 @@ const { locale = "en" } = Astro.props;
   </p>
   <p>{t("footer.notAffiliated", locale)}</p>
   <nav aria-label={t("footer.navLabel", locale)}>
-    <a href={`${import.meta.env.BASE_URL}en/#credits`}>{t("footer.creditsLink", locale)}</a>
+    <a href={localePath(locale, "#credits")}>{t("footer.creditsLink", locale)}</a>
   </nav>
 </footer>

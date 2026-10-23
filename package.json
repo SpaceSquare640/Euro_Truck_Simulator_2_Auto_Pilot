@@ -10,7 +10,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "test:scripts": "node --test scripts/*.test.mjs",
-    "check:deps": "node scripts/check-lockfile.mjs && node scripts/check-licenses.mjs"
+    "check:deps": "node scripts/check-lockfile.mjs && node scripts/check-licenses.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs --root ."
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",

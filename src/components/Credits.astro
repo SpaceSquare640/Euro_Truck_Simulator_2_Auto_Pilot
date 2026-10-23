@@ -1,34 +1,40 @@
 ---
 // Edited by: OpenAI-Codex_Responsible: Website
-import { t } from "../i18n";
+import { t, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
 ---
 
 <section class="content-section" id="credits" aria-labelledby="credits-heading">
-  <h2 class="section-heading" id="credits-heading">{t("credits.title")}</h2>
-  <p>{t("credits.intro")}</p>
+  <h2 class="section-heading" id="credits-heading">{t("credits.title", locale)}</h2>
+  <p>{t("credits.intro", locale)}</p>
   <ul class="outline-list">
     <li>
-      <strong>{t("credits.kingsley.name")}</strong>
-      <p>{t("credits.kingsley.role")}</p>
+      <strong>{t("credits.kingsley.name", locale)}</strong>
+      <p>{t("credits.kingsley.role", locale)}</p>
     </li>
     <li>
-      <strong>{t("credits.claude.name")}</strong>
-      <p>{t("credits.claude.role")}</p>
+      <strong>{t("credits.claude.name", locale)}</strong>
+      <p>{t("credits.claude.role", locale)}</p>
     </li>
     <li>
-      <strong>{t("credits.codex.name")}</strong>
-      <p>{t("credits.codex.role")}</p>
+      <strong>{t("credits.codex.name", locale)}</strong>
+      <p>{t("credits.codex.role", locale)}</p>
     </li>
     <li>
-      <strong>{t("credits.bots.name")}</strong>
-      <p>{t("credits.bots.role")}</p>
+      <strong>{t("credits.bots.name", locale)}</strong>
+      <p>{t("credits.bots.role", locale)}</p>
       <ul class="bot-list">
-        <li>{t("credits.bots.githubActions")}</li>
-        <li>{t("credits.bots.dependabot")}</li>
+        <li>{t("credits.bots.githubActions", locale)}</li>
+        <li>{t("credits.bots.dependabot", locale)}</li>
       </ul>
     </li>
   </ul>
-  <p class="credits-disclaimer">{t("credits.disclaimer")}</p>
+  <p class="credits-disclaimer">{t("credits.disclaimer", locale)}</p>
 </section>
 
 <style>

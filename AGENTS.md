@@ -26,8 +26,14 @@ and an in-browser simulator. All project READMEs link here.
 | Simulator | Interactive demo of the app's behavior |
 
 ## i18n
-- English is the default and source language.
-- No hard-coded UI strings; put them in `src/i18n/<locale>.json`. Use Astro i18n routing (`/en/`, later others).
+- English is the default and source language; `src/i18n/en.json` defines the keys.
+- Register locales in `src/i18n/locales.json`. Enable a locale only when `src/i18n/<code>.json` and `src/pages/<code>/` exist and pass `npm run check:i18n`.
+- Every UI string goes through `t(key, locale)`; the locale argument is required.
+- Internal links use `localePath(locale, path)`. Never hard-code a locale segment in components, layouts or views.
+- Page bodies live in `src/views/*View.astro`; `src/pages/<code>/` files are thin wrappers that only pass the locale.
+- Add a new key to every enabled locale in the same commit.
+- Review status and safety meaning across locales before release, including Planned, Draft, Not started, the installer sentence, safety principles and the not-affiliated notice.
+- The Change Log stays English. Use system font stacks; do not add web fonts.
 
 ## Assets
 - Images, icons and Social Preview are produced by Codex and stored under `public/` or `src/assets/`.
@@ -56,6 +62,7 @@ and an in-browser simulator. All project READMEs link here.
 - Website Link Check checks built HTML links against the Pages base path, target files, and named anchors.
 - Website Actionlint checks workflow syntax after workflow changes.
 - Website CI runs `check:deps` to enforce lockfile integrity and the dependency license policy.
+- Website CI runs `check:i18n` for key parity, route mirroring, hard-coded locale paths and layout budgets; it must report non-zero counts.
 - Every check must report its actual nonzero number of files, pages, links, workflows, packages, or tests inspected. A zero count must fail instead of reporting success.
 
 ## Test temporary files

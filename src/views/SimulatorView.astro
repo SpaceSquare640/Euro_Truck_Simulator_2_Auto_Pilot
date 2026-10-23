@@ -1,0 +1,26 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import { t, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+---
+
+<Base title={t("simulator.title", locale)} description={t("simulator.description", locale)} locale={locale}>
+  <section aria-labelledby="simulator-heading">
+    <h1 class="page-heading" id="simulator-heading">{t("simulator.heading", locale)}</h1>
+    <p class="page-intro">{t("simulator.intro", locale)}</p>
+    <div
+      class="simulator-placeholder"
+      data-island-placeholder="simulator"
+      role="status"
+      aria-label={t("simulator.placeholderLabel", locale)}
+    >
+      <p>{t("simulator.placeholder", locale)}</p>
+    </div>
+  </section>
+</Base>

@@ -1,6 +1,12 @@
 ---
 // Edited by: OpenAI-Codex_Responsible: Website
-import { t } from "../i18n";
+import { t, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
 
 function splitNodeLabel(label: string): string[] {
   const separator = label.indexOf(" (");
@@ -9,16 +15,16 @@ function splitNodeLabel(label: string): string[] {
     : [label.slice(0, separator), label.slice(separator + 1)];
 }
 
-const pluginLines = splitNodeLabel(t("architecture.node.plugin"));
-const coreLines = splitNodeLabel(t("architecture.node.core"));
-const inputLines = splitNodeLabel(t("architecture.node.input"));
-const uiLines = splitNodeLabel(t("architecture.node.ui"));
+const pluginLines = splitNodeLabel(t("architecture.node.plugin", locale));
+const coreLines = splitNodeLabel(t("architecture.node.core", locale));
+const inputLines = splitNodeLabel(t("architecture.node.input", locale));
+const uiLines = splitNodeLabel(t("architecture.node.ui", locale));
 ---
 
 <div class="diagram-desktop">
 <svg role="img" aria-labelledby="architecture-diagram-title architecture-diagram-desc" viewBox="0 0 960 690">
-  <title id="architecture-diagram-title">{t("architecture.diagramTitle")}</title>
-  <desc id="architecture-diagram-desc">{t("architecture.diagramDesc")}</desc>
+  <title id="architecture-diagram-title">{t("architecture.diagramTitle", locale)}</title>
+  <desc id="architecture-diagram-desc">{t("architecture.diagramDesc", locale)}</desc>
   <defs>
     <marker id="architecture-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
       <path d="M 1 1 L 10 6 L 1 11 Z" />
@@ -32,16 +38,16 @@ const uiLines = splitNodeLabel(t("architecture.node.ui"));
   <path class="connection" d="M 690 190 L 590 465" marker-end="url(#architecture-arrow)" />
   <path class="connection" d="M 605 465 L 705 190" marker-end="url(#architecture-arrow)" />
 
-  <text class="edge-label" x="315" y="75" text-anchor="middle">{t("architecture.edge.sdk")}</text>
-  <text class="edge-label" x="640" y="75" text-anchor="middle">{t("architecture.edge.shm")}</text>
-  <text class="edge-label" x="842" y="330" text-anchor="middle" transform="rotate(-90 842 330)">{t("architecture.edge.controlPipe")}</text>
-  <text class="edge-label" x="480" y="655" text-anchor="middle">{t("architecture.edge.virtual")}</text>
+  <text class="edge-label" x="315" y="75" text-anchor="middle">{t("architecture.edge.sdk", locale)}</text>
+  <text class="edge-label" x="640" y="75" text-anchor="middle">{t("architecture.edge.shm", locale)}</text>
+  <text class="edge-label" x="842" y="330" text-anchor="middle" transform="rotate(-90 842 330)">{t("architecture.edge.controlPipe", locale)}</text>
+  <text class="edge-label" x="480" y="655" text-anchor="middle">{t("architecture.edge.virtual", locale)}</text>
   <rect class="edge-label-background" x="405" y="330" width="310" height="32" rx="6" />
-  <text class="edge-label" x="560" y="352" text-anchor="middle">{t("architecture.edge.uiPipe")}</text>
+  <text class="edge-label" x="560" y="352" text-anchor="middle">{t("architecture.edge.uiPipe", locale)}</text>
 
   <g class="node">
     <rect x="25" y="105" width="255" height="85" rx="12" />
-    <text x="152" y="154" text-anchor="middle">{t("architecture.node.game")}</text>
+    <text x="152" y="154" text-anchor="middle">{t("architecture.node.game", locale)}</text>
   </g>
   <g class="node">
     <rect x="355" y="105" width="250" height="85" rx="12" />
@@ -75,20 +81,20 @@ const uiLines = splitNodeLabel(t("architecture.node.ui"));
 </div>
 
 <div class="diagram-mobile" aria-hidden="true">
-  <div class="flow-node">{t("architecture.node.game")}</div>
-  <div class="flow-link">{t("architecture.edge.sdk")}</div>
-  <div class="flow-node">{t("architecture.node.plugin")}</div>
-  <div class="flow-link">{t("architecture.edge.shm")}</div>
-  <div class="flow-node">{t("architecture.node.core")}</div>
+  <div class="flow-node">{t("architecture.node.game", locale)}</div>
+  <div class="flow-link">{t("architecture.edge.sdk", locale)}</div>
+  <div class="flow-node">{t("architecture.node.plugin", locale)}</div>
+  <div class="flow-link">{t("architecture.edge.shm", locale)}</div>
+  <div class="flow-node">{t("architecture.node.core", locale)}</div>
   <div class="flow-branch">
-    <div class="flow-link">{t("architecture.edge.controlPipe")}</div>
-    <div class="flow-node">{t("architecture.node.input")}</div>
-    <div class="flow-link">{t("architecture.edge.virtual")}</div>
-    <div class="flow-node flow-node-return">{t("architecture.node.game")}</div>
+    <div class="flow-link">{t("architecture.edge.controlPipe", locale)}</div>
+    <div class="flow-node">{t("architecture.node.input", locale)}</div>
+    <div class="flow-link">{t("architecture.edge.virtual", locale)}</div>
+    <div class="flow-node flow-node-return">{t("architecture.node.game", locale)}</div>
   </div>
   <div class="flow-branch">
-    <div class="flow-link flow-link-bidirectional">{t("architecture.edge.uiPipe")}</div>
-    <div class="flow-node">{t("architecture.node.ui")}</div>
+    <div class="flow-link flow-link-bidirectional">{t("architecture.edge.uiPipe", locale)}</div>
+    <div class="flow-node">{t("architecture.node.ui", locale)}</div>
   </div>
 </div>
 

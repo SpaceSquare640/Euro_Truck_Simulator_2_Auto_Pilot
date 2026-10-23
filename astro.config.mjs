@@ -1,5 +1,8 @@
 // Edited by: OpenAI-Codex_Responsible: Website
 import { defineConfig } from "astro/config";
+import { readFileSync } from "node:fs";
+
+const registry = JSON.parse(readFileSync(new URL("./src/i18n/locales.json", import.meta.url), "utf8"));
 
 export default defineConfig({
   site: "https://spacesquare640.github.io",
@@ -7,8 +10,8 @@ export default defineConfig({
   output: "static",
   trailingSlash: "always",
   i18n: {
-    defaultLocale: "en",
-    locales: ["en"],
+    defaultLocale: registry.default,
+    locales: registry.locales.filter((locale) => locale.enabled).map((locale) => locale.code),
     routing: {
       prefixDefaultLocale: true,
     },

@@ -1,0 +1,116 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import ArchitectureDiagram from "../components/ArchitectureDiagram.astro";
+import { t, localePath, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const flow = [
+  t("architecture.flow.one", locale),
+  t("architecture.flow.two", locale),
+  t("architecture.flow.three", locale),
+  t("architecture.flow.four", locale),
+  t("architecture.flow.five", locale),
+];
+const modules = [
+  { name: t("architecture.module.plugin.name", locale), language: t("architecture.module.plugin.language", locale), role: t("architecture.module.plugin.role", locale) },
+  { name: t("architecture.module.input.name", locale), language: t("architecture.module.input.language", locale), role: t("architecture.module.input.role", locale) },
+  { name: t("architecture.module.core.name", locale), language: t("architecture.module.core.language", locale), role: t("architecture.module.core.role", locale) },
+  { name: t("architecture.module.ui.name", locale), language: t("architecture.module.ui.language", locale), role: t("architecture.module.ui.role", locale) },
+];
+const safety = [
+  t("architecture.safety.one", locale),
+  t("architecture.safety.two", locale),
+  t("architecture.safety.three", locale),
+  t("architecture.safety.four", locale),
+  t("architecture.safety.five", locale),
+];
+---
+
+<Base title={t("architecture.title", locale)} description={t("architecture.description", locale)} locale={locale}>
+  <h1 class="page-heading">{t("architecture.heading", locale)}</h1>
+  <p class="page-intro">{t("architecture.intro", locale)}</p>
+
+  <section class="content-section" aria-labelledby="architecture-flow-heading">
+    <h2 class="section-heading" id="architecture-flow-heading">{t("architecture.flowHeading", locale)}</h2>
+    <ArchitectureDiagram locale={locale} />
+    <ol class="outline-list">
+      {flow.map((step) => <li>{step}</li>)}
+    </ol>
+  </section>
+
+  <section class="content-section" aria-labelledby="architecture-modules-heading">
+    <h2 class="section-heading" id="architecture-modules-heading">{t("architecture.modulesHeading", locale)}</h2>
+    <div class="table-scroll">
+      <table>
+        <caption>{t("architecture.modulesCaption", locale)}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t("architecture.col.module", locale)}</th>
+            <th scope="col">{t("architecture.col.language", locale)}</th>
+            <th scope="col">{t("architecture.col.role", locale)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {modules.map((module) => (
+            <tr>
+              <th scope="row">{module.name}</th>
+              <td>{module.language}</td>
+              <td>{module.role}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="content-section" aria-labelledby="architecture-safety-heading">
+    <h2 class="section-heading" id="architecture-safety-heading">{t("architecture.safetyHeading", locale)}</h2>
+    <p>{t("architecture.safetyIntro", locale)}</p>
+    <ul class="outline-list">
+      {safety.map((principle) => <li>{principle}</li>)}
+    </ul>
+  </section>
+
+  <ul class="outline-list">
+    <li><a href={localePath(locale, "docs/")}>{t("architecture.backLink", locale)}</a></li>
+    <li><a href={localePath(locale, "docs/status/")}>{t("architecture.statusLink", locale)}</a></li>
+  </ul>
+</Base>
+
+<style>
+  /* Edited by: OpenAI-Codex_Responsible: Website */
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    min-width: 42rem;
+    margin-top: 1.5rem;
+    border-collapse: collapse;
+  }
+
+  caption {
+    padding-bottom: 0.7rem;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  th,
+  td {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--text);
+  }
+</style>

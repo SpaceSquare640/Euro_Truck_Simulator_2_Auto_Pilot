@@ -1,24 +1,25 @@
 ---
 // Edited by: OpenAI-Codex_Responsible: Website
-import { t, type Locale } from "../i18n";
+import LanguageSwitcher from "./LanguageSwitcher.astro";
+import { localePath, t, type Locale } from "../i18n";
 
 interface Props {
-  locale?: Locale;
+  locale: Locale;
 }
 
-const { locale = "en" } = Astro.props;
+const { locale } = Astro.props;
 const baseUrl = import.meta.env.BASE_URL;
 const links = [
-  { label: t("nav.home", locale), href: `${baseUrl}en/` },
-  { label: t("nav.docs", locale), href: `${baseUrl}en/docs/` },
-  { label: t("nav.changelog", locale), href: `${baseUrl}en/changelog/` },
-  { label: t("nav.wiki", locale), href: `${baseUrl}en/wiki/` },
-  { label: t("nav.simulator", locale), href: `${baseUrl}en/simulator/` },
+  { label: t("nav.home", locale), href: localePath(locale) },
+  { label: t("nav.docs", locale), href: localePath(locale, "docs/") },
+  { label: t("nav.changelog", locale), href: localePath(locale, "changelog/") },
+  { label: t("nav.wiki", locale), href: localePath(locale, "wiki/") },
+  { label: t("nav.simulator", locale), href: localePath(locale, "simulator/") },
 ];
 ---
 
 <nav class="site-nav" aria-label={t("nav.label", locale)}>
-  <a class="brand" href={`${baseUrl}en/`}>
+  <a class="brand" href={localePath(locale)}>
     <img src={`${baseUrl}icon.svg`} width="36" height="36" alt="" />
     <span>{t("site.name", locale)}</span>
   </a>
@@ -27,4 +28,5 @@ const links = [
       <li><a href={link.href}>{link.label}</a></li>
     ))}
   </ul>
+  <LanguageSwitcher locale={locale} />
 </nav>

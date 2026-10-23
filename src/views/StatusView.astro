@@ -1,0 +1,112 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import { t, localePath, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const rows = [
+  { item: t("status.row.architecture", locale), state: t("label.draft", locale) },
+  { item: t("status.row.interfaces", locale), state: t("label.draft", locale), note: t("status.row.interfacesNote", locale) },
+  { item: t("status.row.checks", locale), state: t("label.available", locale) },
+  { item: t("status.row.plugin", locale), state: t("label.notStarted", locale) },
+  { item: t("status.row.input", locale), state: t("label.notStarted", locale) },
+  { item: t("status.row.core", locale), state: t("label.notStarted", locale) },
+  { item: t("status.row.ui", locale), state: t("label.notStarted", locale) },
+  { item: t("status.row.simulator", locale), state: t("label.planned", locale), note: t("status.row.simulatorNote", locale) },
+  { item: t("status.row.release", locale), state: t("label.notScheduled", locale) },
+];
+const roadmap = [
+  t("status.roadmap.one", locale),
+  t("status.roadmap.two", locale),
+  t("status.roadmap.three", locale),
+  t("status.roadmap.four", locale),
+  t("status.roadmap.five", locale),
+];
+---
+
+<Base title={t("status.title", locale)} description={t("status.description", locale)} locale={locale}>
+  <h1 class="page-heading">{t("status.heading", locale)}</h1>
+  <p class="page-intro">{t("status.intro", locale)}</p>
+  <p>{t("status.updated", locale)}</p>
+
+  <section class="content-section" aria-labelledby="status-table-heading">
+    <h2 class="section-heading" id="status-table-heading">{t("status.tableHeading", locale)}</h2>
+    <div class="table-scroll">
+      <table>
+        <caption>{t("status.tableCaption", locale)}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t("status.col.item", locale)}</th>
+            <th scope="col">{t("status.col.state", locale)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr>
+              <th scope="row">{row.item}</th>
+              <td>
+                <span class="status-label">{row.state}</span>
+                {row.note && <p>{row.note}</p>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="content-section" aria-labelledby="status-roadmap-heading">
+    <h2 class="section-heading" id="status-roadmap-heading">{t("status.roadmapHeading", locale)}</h2>
+    <p>{t("status.roadmapIntro", locale)}</p>
+    <ol class="outline-list">
+      {roadmap.map((step) => <li>{step}</li>)}
+    </ol>
+  </section>
+
+  <ul class="outline-list">
+    <li><a href={localePath(locale, "changelog/")}>{t("status.changelogLink", locale)}</a></li>
+    <li><a href={localePath(locale, "docs/")}>{t("status.backLink", locale)}</a></li>
+  </ul>
+</Base>
+
+<style>
+  /* Edited by: OpenAI-Codex_Responsible: Website */
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    min-width: 34rem;
+    margin-top: 1.5rem;
+    border-collapse: collapse;
+  }
+
+  caption {
+    padding-bottom: 0.7rem;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  th,
+  td {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--text);
+  }
+
+  td p {
+    margin: 0.5rem 0 0;
+    color: var(--muted);
+  }
+</style>

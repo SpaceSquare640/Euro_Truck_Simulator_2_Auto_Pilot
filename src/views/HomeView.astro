@@ -1,0 +1,64 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import Base from "../layouts/Base.astro";
+import Credits from "../components/Credits.astro";
+import StatusBanner from "../components/StatusBanner.astro";
+import { t, localePath, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+
+const features = [
+  { title: t("home.featureOneTitle", locale), body: t("home.featureOneBody", locale) },
+  { title: t("home.featureTwoTitle", locale), body: t("home.featureTwoBody", locale) },
+  { title: t("home.featureThreeTitle", locale), body: t("home.featureThreeBody", locale) },
+];
+const links = [
+  { title: t("home.docsCardTitle", locale), body: t("home.docsCardBody", locale), href: localePath(locale, "docs/") },
+  { title: t("home.changelogCardTitle", locale), body: t("home.changelogCardBody", locale), href: localePath(locale, "changelog/") },
+  { title: t("home.wikiCardTitle", locale), body: t("home.wikiCardBody", locale), href: localePath(locale, "wiki/") },
+  { title: t("home.simulatorCardTitle", locale), body: t("home.simulatorCardBody", locale), href: localePath(locale, "simulator/") },
+];
+---
+
+<Base title={t("home.title", locale)} description={t("home.description", locale)} locale={locale}>
+  <section class="hero" aria-labelledby="home-heading">
+    <p class="eyebrow">{t("home.eyebrow", locale)}</p>
+    <h1 class="hero-heading" id="home-heading">{t("home.heading", locale)}</h1>
+    <p class="hero-intro">{t("home.intro", locale)}</p>
+    <div class="hero-actions">
+      <a class="button" href={localePath(locale, "docs/")}>{t("home.primaryAction", locale)}</a>
+      <a class="button button-secondary" href={localePath(locale, "simulator/")}>{t("home.secondaryAction", locale)}</a>
+    </div>
+  </section>
+
+  <StatusBanner locale={locale} />
+
+  <section class="content-section" aria-labelledby="features-heading">
+    <h2 class="section-heading" id="features-heading">{t("home.featuresHeading", locale)}</h2>
+    <div class="feature-grid">
+      {features.map((feature) => (
+        <article class="feature-card">
+          <h3>{feature.title}</h3>
+          <p>{feature.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="content-section" aria-labelledby="explore-heading">
+    <h2 class="section-heading" id="explore-heading">{t("home.exploreHeading", locale)}</h2>
+    <div class="link-grid">
+      {links.map((link) => (
+        <article class="link-card">
+          <h3><a href={link.href}>{link.title}</a></h3>
+          <p>{link.body}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+  <Credits locale={locale} />
+</Base>

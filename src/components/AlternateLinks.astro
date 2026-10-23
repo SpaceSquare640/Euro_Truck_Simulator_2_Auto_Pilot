@@ -1,0 +1,25 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import { alternateLocales, defaultLocale, type Locale } from "../i18n";
+
+interface Props {
+  locale: Locale;
+  origin: URL;
+}
+
+const { locale, origin } = Astro.props;
+const alternates = alternateLocales(locale, Astro.url.pathname);
+---
+
+{alternates.length > 1 && (
+  <>
+    {alternates.map((alternate) => (
+      <link rel="alternate" hreflang={alternate.htmlLang} href={new URL(alternate.href, origin).toString()} />
+    ))}
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href={new URL(alternates.find((alternate) => alternate.locale === defaultLocale)!.href, origin).toString()}
+    />
+  </>
+)}

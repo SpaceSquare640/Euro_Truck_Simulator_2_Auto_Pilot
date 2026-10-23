@@ -1,0 +1,7 @@
+{
+  "identicalAllowed": [],
+  "layoutBudgets": [
+    { "keyPattern": "^architecture\\.node\\.", "splitAt": " (", "maxUnitsPerLine": 22 },
+    { "keyPattern": "^architecture\\.edge\\.", "maxUnitsPerLine": 31 }
+  ]
+}
