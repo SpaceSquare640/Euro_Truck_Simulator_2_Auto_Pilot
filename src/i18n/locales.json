@@ -1,6 +1,7 @@
 {
   "default": "en",
   "locales": [
-    { "code": "en", "htmlLang": "en", "autonym": "English", "script": "Latn", "enabled": true }
+    { "code": "en", "htmlLang": "en", "autonym": "English", "script": "Latn", "enabled": true },
+    { "code": "zh-hant", "htmlLang": "zh-Hant", "autonym": "繁體中文", "script": "Han", "enabled": true }
   ]
 }

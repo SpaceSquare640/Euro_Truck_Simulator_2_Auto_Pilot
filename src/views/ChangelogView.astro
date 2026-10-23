@@ -2,7 +2,7 @@
 // Edited by: OpenAI-Codex_Responsible: Website
 import Base from "../layouts/Base.astro";
 import { Content } from "../content/changelog.md";
-import { t, type Locale } from "../i18n";
+import { defaultLocale, t, type Locale } from "../i18n";
 
 interface Props {
   locale: Locale;
@@ -15,7 +15,8 @@ const { locale } = Astro.props;
   <section aria-labelledby="changelog-heading">
     <h1 class="page-heading" id="changelog-heading">{t("changelog.heading", locale)}</h1>
     <p class="page-intro">{t("changelog.intro", locale)}</p>
-    <article class="changelog-content">
+    {locale !== defaultLocale && <p class="changelog-notice">{t("changelog.englishNotice", locale)}</p>}
+    <article class="changelog-content" lang={locale !== defaultLocale ? "en" : undefined}>
       <Content />
     </article>
   </section>

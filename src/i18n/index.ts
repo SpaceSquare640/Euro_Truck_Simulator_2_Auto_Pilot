@@ -1,8 +1,9 @@
 // Edited by: OpenAI-Codex_Responsible: Website
 import registry from "./locales.json";
 import en from "./en.json";
+import zhHant from "./zh-hant.json";
 
-const dictionaries = { en } as const;
+const dictionaries = { en, "zh-hant": zhHant satisfies Record<MessageKey, string> } as const;
 
 export type Locale = keyof typeof dictionaries;
 export type MessageKey = keyof typeof en;

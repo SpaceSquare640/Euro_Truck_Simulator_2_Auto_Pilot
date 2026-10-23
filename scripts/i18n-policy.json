@@ -1,5 +1,22 @@
 {
-  "identicalAllowed": [],
+  "identicalAllowed": [
+    "site.name",
+    "site.fullName",
+    "nav.wiki",
+    "home.wikiCardTitle",
+    "credits.kingsley.name",
+    "credits.claude.name",
+    "credits.codex.name",
+    "credits.bots.githubActions",
+    "credits.bots.dependabot",
+    "footer.licenseName",
+    "footer.licenseHref",
+    "architecture.node.game",
+    "architecture.module.plugin.language",
+    "architecture.module.input.language",
+    "architecture.module.core.language",
+    "architecture.module.ui.language"
+  ],
   "layoutBudgets": [
     { "keyPattern": "^architecture\\.node\\.", "splitAt": " (", "maxUnitsPerLine": 22 },
     { "keyPattern": "^architecture\\.edge\\.", "maxUnitsPerLine": 31 }

@@ -46,6 +46,7 @@
   "changelog.description": "Project changes synced from the source branch.",
   "changelog.heading": "Change Log",
   "changelog.intro": "This page displays the project change log maintained by the source branch.",
+  "changelog.englishNotice": "The Change Log is maintained in English and is not translated.",
   "wiki.title": "Project Wiki",
   "wiki.description": "A topic outline for project concepts, game SDK connection, driving behavior, and troubleshooting.",
   "wiki.heading": "Project Wiki",
