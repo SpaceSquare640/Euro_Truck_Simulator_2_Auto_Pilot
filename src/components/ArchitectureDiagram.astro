@@ -3,6 +3,7 @@
 import { t } from "../i18n";
 ---
 
+<div class="diagram-desktop">
 <svg role="img" aria-labelledby="architecture-diagram-title architecture-diagram-desc" viewBox="0 0 960 690">
   <title id="architecture-diagram-title">{t("architecture.diagramTitle")}</title>
   <desc id="architecture-diagram-desc">{t("architecture.diagramDesc")}</desc>
@@ -47,6 +48,25 @@ import { t } from "../i18n";
     <text x="480" y="520" text-anchor="middle">{t("architecture.node.ui")}</text>
   </g>
 </svg>
+</div>
+
+<div class="diagram-mobile" aria-hidden="true">
+  <div class="flow-node">{t("architecture.node.game")}</div>
+  <div class="flow-link">{t("architecture.edge.sdk")}</div>
+  <div class="flow-node">{t("architecture.node.plugin")}</div>
+  <div class="flow-link">{t("architecture.edge.shm")}</div>
+  <div class="flow-node">{t("architecture.node.core")}</div>
+  <div class="flow-branch">
+    <div class="flow-link">{t("architecture.edge.controlPipe")}</div>
+    <div class="flow-node">{t("architecture.node.input")}</div>
+    <div class="flow-link">{t("architecture.edge.virtual")}</div>
+    <div class="flow-node flow-node-return">{t("architecture.node.game")}</div>
+  </div>
+  <div class="flow-branch">
+    <div class="flow-link flow-link-bidirectional">{t("architecture.edge.uiPipe")}</div>
+    <div class="flow-node">{t("architecture.node.ui")}</div>
+  </div>
+</div>
 
 <style>
   /* Edited by: OpenAI-Codex_Responsible: Website */
@@ -90,5 +110,63 @@ import { t } from "../i18n";
     fill: var(--text);
     font-size: 18px;
     font-weight: 650;
+  }
+
+  /* Edited by: OpenAI-Codex_Responsible: Website */
+  .diagram-mobile {
+    display: none;
+  }
+
+  .flow-node {
+    padding: 0.9rem 1rem;
+    border: 2px solid var(--accent);
+    border-radius: 0.75rem;
+    color: var(--text);
+    background: var(--surface-raised);
+    font-size: 1rem;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
+
+  .flow-node-return {
+    border-style: dashed;
+  }
+
+  .flow-link {
+    color: var(--muted);
+    font-size: 1rem;
+    text-align: center;
+  }
+
+  .flow-link::before {
+    content: "\2193";
+    display: inline-block;
+    margin-right: 0.5rem;
+    color: var(--accent);
+    font-size: 1.4rem;
+  }
+
+  .flow-link-bidirectional::before {
+    content: "\2195";
+  }
+
+  .flow-branch {
+    display: grid;
+    gap: 0.5rem;
+    margin-left: 1rem;
+    padding-left: 1rem;
+    border-left: 3px solid var(--accent);
+  }
+
+  @media (max-width: 760px) {
+    .diagram-desktop {
+      display: none;
+    }
+
+    .diagram-mobile {
+      display: grid;
+      gap: 0.5rem;
+    }
   }
 </style>
