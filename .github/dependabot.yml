@@ -7,7 +7,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-  # Website pins Astro 7.x and TypeScript 6.x; @astrojs/check 0.9.12 supports only TypeScript ^5 or ^6, so major updates can break the website build. Edited by: OpenAI-Codex_Responsible: Source_Code
+  # Website pins Astro 7.x and TypeScript 6.x; @astrojs/check 0.9.12 supports only TypeScript ^5 or ^6, so major updates can break the website build.
   - package-ecosystem: npm
     directory: /
     target-branch: Euro_Truck_Simulator_2_Auto_Pilot_Website

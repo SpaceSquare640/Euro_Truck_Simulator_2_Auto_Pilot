@@ -1,4 +1,5 @@
 # Edited by: Anthropic-Claude_Code
+# Edited by: OpenAI-Codex_Responsible: Source_Code
 # Fails when a dependency uses a license outside the allow-list in CONTRIBUTING.md.
 name: License Check
 
@@ -33,7 +34,7 @@ jobs:
         run: |
           pip install .
           pip install pip-licenses
-          pip-licenses --partial-match --allow-only="MIT;BSD;Apache;ISC;zlib;Python Software Foundation;Mozilla Public License 2.0"
+          pip-licenses --partial-match --allow-only="MIT;BSD;Apache;ISC;zlib;Python Software Foundation"
 
   dotnet:
     runs-on: windows-latest
