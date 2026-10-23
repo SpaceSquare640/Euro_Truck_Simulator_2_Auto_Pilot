@@ -4,24 +4,25 @@ Status: v1.0 draft. This directory is the contract between the native, Python, a
 
 | Channel | Producer | Consumer | Transport | Specification |
 |---|---|---|---|---|
-| Telemetry | native/plugin | python | Windows shared memory | [telemetry v1](ipc/telemetry.v1.md) |
-| Control | python | native/input | Windows named pipe | [control v1](ipc/control.v1.md) |
-| UI | python and ui | ui and python | Windows named pipe | [ui v1](ipc/ui.v1.md), [JSON Schema](ipc/ui.v1.schema.json) |
+| Telemetry | native/plugin | python | 4096-byte Windows shared mapping; 240-byte v1.0 struct | [telemetry v1](ipc/telemetry.v1.md) |
+| Control | python commands; native/input status | native/input commands; python status | Windows named pipe, overlapped I/O | [control v1](ipc/control.v1.md) |
+| UI | python and ui | ui and python | Windows named pipe; engage uses state_revision | [ui v1](ipc/ui.v1.md), [JSON Schema](ipc/ui.v1.schema.json) |
 
 ## Common representation
 
 - The supported platform is Windows 10/11 x64. Binary integers and IEEE 754 binary64 values use little-endian byte order. Binary structures use 8-byte packing. Protocol booleans are uint8 values 0 or 1, never a language-native bool.
 - Physical quantities use SI units: m, m/s, rad, rad/s, and s. Normalized controls use [0,1] or [-1,1]. Engine angular speed is rad/s; SDK RPM is converted by 2π/60.
-- A timestamp is an unsigned 64-bit integer count of nanoseconds from the machine's monotonic QueryPerformanceCounter (QPC) clock, using its reported frequency for conversion. It is not Unix time. The JSON representation is a base-10 string to avoid integer precision loss. Values are comparable only on the same Windows boot.
+- A timestamp is an unsigned 64-bit integer count of nanoseconds from the machine's monotonic QueryPerformanceCounter (QPC) clock. The integer conversion formula and language-specific clocks are defined in [telemetry v1](ipc/telemetry.v1.md#time-and-publication). It is not Unix time. The JSON representation is a base-10 string to avoid integer precision loss. Values are comparable only on the same Windows boot.
 - The world frame follows the SCS Telemetry SDK frame: +X east, +Y up, +Z south (right-handed), as confirmed against the official SCS Telemetry SDK 1.16 headers. The local vehicle frame is +X right, +Y up, +Z back; the world origin is game-defined. Telemetry placement uses the world frame, while linear and angular velocity use the local frame.
-- Steering and angles use counterclockwise as positive. Positive steering turns left; native/input translates this convention to the virtual controller axis.
+- Steering and angles use counterclockwise as positive. Positive steering turns left; native/input translates this convention to the virtual controller axis. Roll is positive by the right-hand rule around the vehicle's local +Z axis.
+- IPC access is limited to the current user SID; remote pipe clients are rejected. The game and Python need compatible privilege levels. Each channel defines its own exact mapping or pipe access rules.
 - Any value that cannot be produced or validated is marked unavailable by the channel-specific validity mechanism. Zero is not a substitute for a valid reading.
 
 ## Versions and extensions
 
 The version is major.minor, starting at 1.0. A reader rejects an unknown major version. A new optional field increments minor; old readers of the same major must ignore the new field. Removing a field, changing its meaning, unit, offset, type, framing, or required behavior increments major. A minor release cannot make an existing optional field mandatory.
 
-For binary channels, append new fields after the existing layout and increase struct_size or packet_size; never move or reinterpret existing bytes. The v1.0 prefix remains readable. For JSON, add optional members and allow unknown members; a v1 reader accepts any 1.x message it otherwise understands. New message types may be ignored if they have no safety effect. Reserved bytes and flags must be zero unless a later version defines them. Safety-critical unknown flags are rejected.
+For binary channels, append new fields after the existing layout and increase struct_size or packet_size; never move or reinterpret existing bytes. The v1.0 prefix remains readable. Telemetry 1.x extensions must fit within its 4096-byte mapping; a larger mapping requires a new major. For JSON, add optional members and allow unknown members; a v1 reader accepts any 1.x message it otherwise understands. Unknown UI requests receive an error; unknown events may be ignored only if they have no safety effect. Writers set reserved bytes and flags to zero. Telemetry readers ignore reserved bytes for compatible 1.x extensions; control receivers reject nonzero reserved bytes or unknown flags until a new major version or an explicitly negotiated capability defines them.
 
 To add a field:
 

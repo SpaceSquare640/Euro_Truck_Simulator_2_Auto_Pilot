@@ -2,29 +2,189 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$comment": "Edited by: OpenAI-Codex_Responsible: Source_Code",
   "title": "ETS2AP UI IPC v1 message",
-  "description": "One decoded JSON message after the 4-byte little-endian frame length.",
-  "oneOf": [
-    { "$ref": "#/$defs/hello" },
-    { "$ref": "#/$defs/getStatus" },
-    { "$ref": "#/$defs/setConfig" },
-    { "$ref": "#/$defs/engage" },
-    { "$ref": "#/$defs/disengage" },
-    { "$ref": "#/$defs/helloAck" },
-    { "$ref": "#/$defs/status" },
-    { "$ref": "#/$defs/configMessage" },
-    { "$ref": "#/$defs/log" },
-    { "$ref": "#/$defs/error" }
+  "description": "First validate $defs/base, then check the major version, then validate the type-specific payload. Whole-schema validation is not version detection: a 2.0 message may also fail a payload rule.",
+  "allOf": [
+    {
+      "$ref": "#/$defs/base"
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "hello"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/hello"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "get_status"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/getStatus"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "set_config"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/setConfig"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "engage"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/engage"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "disengage"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/disengage"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "hello_ack"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/helloAck"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "status"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/status"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "config"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/configMessage"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "log"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/log"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "error"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "$ref": "#/$defs/error"
+      }
+    }
   ],
   "$defs": {
     "base": {
       "type": "object",
-      "required": ["type", "version", "id", "timestamp", "payload"],
+      "required": [
+        "type",
+        "version",
+        "id",
+        "timestamp",
+        "payload"
+      ],
       "properties": {
-        "type": { "type": "string" },
-        "version": { "type": "string", "pattern": "^1[.][0-9]+$" },
-        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,64}$" },
-        "timestamp": { "$ref": "#/$defs/uint64Decimal" },
-        "payload": { "type": "object" }
+        "type": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+[.][0-9]+$"
+        },
+        "id": {
+          "$ref": "#/$defs/idString"
+        },
+        "timestamp": {
+          "$ref": "#/$defs/uint64Decimal"
+        },
+        "payload": {
+          "type": "object"
+        }
       },
       "additionalProperties": true
     },
@@ -53,11 +213,15 @@
         "INVALID_CONFIG",
         "UNSUPPORTED_VERSION",
         "MALFORMED_MESSAGE",
+        "STALE_STATUS",
         "INTERNAL_ERROR"
       ]
     },
     "nullableNonnegative": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "minimum": 0
     },
     "telemetrySummary": {
@@ -69,40 +233,58 @@
         "telemetry_age_s"
       ],
       "properties": {
-        "speed_mps": { "$ref": "#/$defs/nullableNonnegative" },
-        "speed_limit_mps": { "$ref": "#/$defs/nullableNonnegative" },
-        "navigation_distance_m": { "$ref": "#/$defs/nullableNonnegative" },
-        "telemetry_age_s": { "$ref": "#/$defs/nullableNonnegative" }
+        "speed_mps": {
+          "$ref": "#/$defs/nullableNonnegative"
+        },
+        "speed_limit_mps": {
+          "$ref": "#/$defs/nullableNonnegative"
+        },
+        "navigation_distance_m": {
+          "$ref": "#/$defs/nullableNonnegative"
+        },
+        "telemetry_age_s": {
+          "$ref": "#/$defs/nullableNonnegative",
+          "description": "Age in seconds of latest valid telemetry snapshot; null if none has ever been received."
+        }
       },
       "additionalProperties": true
     },
     "config": {
       "type": "object",
-      "required": ["target_speed_mps"],
+      "required": [
+        "target_speed_mps"
+      ],
       "properties": {
         "target_speed_mps": {
           "type": "number",
-          "minimum": 0,
-          "maximum": 40
+          "description": "Application range 0 to 40 m/s; out-of-range numeric values receive INVALID_CONFIG."
         }
       },
       "additionalProperties": true
     },
     "hello": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "hello" },
+            "type": {
+              "const": "hello"
+            },
             "payload": {
               "type": "object",
-              "required": ["supported_versions"],
+              "required": [
+                "supported_versions"
+              ],
               "properties": {
                 "supported_versions": {
                   "type": "array",
                   "minItems": 1,
                   "uniqueItems": true,
-                  "items": { "$ref": "#/$defs/versionString" }
+                  "items": {
+                    "$ref": "#/$defs/versionString"
+                  }
                 }
               },
               "additionalProperties": true
@@ -113,26 +295,40 @@
     },
     "getStatus": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "get_status" },
-            "payload": { "$ref": "#/$defs/emptyPayload" }
+            "type": {
+              "const": "get_status"
+            },
+            "payload": {
+              "$ref": "#/$defs/emptyPayload"
+            }
           }
         }
       ]
     },
     "setConfig": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "set_config" },
+            "type": {
+              "const": "set_config"
+            },
             "payload": {
               "type": "object",
-              "required": ["config"],
+              "required": [
+                "config"
+              ],
               "properties": {
-                "config": { "$ref": "#/$defs/config" }
+                "config": {
+                  "$ref": "#/$defs/config"
+                }
               },
               "additionalProperties": true
             }
@@ -142,37 +338,67 @@
     },
     "engage": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "engage" },
-            "payload": { "$ref": "#/$defs/emptyPayload" }
+            "type": {
+              "const": "engage"
+            },
+            "payload": {
+              "type": "object",
+              "required": [
+                "state_revision"
+              ],
+              "properties": {
+                "state_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
           }
         }
       ]
     },
     "disengage": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "disengage" },
-            "payload": { "$ref": "#/$defs/emptyPayload" }
+            "type": {
+              "const": "disengage"
+            },
+            "payload": {
+              "$ref": "#/$defs/emptyPayload"
+            }
           }
         }
       ]
     },
     "helloAck": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "hello_ack" },
+            "type": {
+              "const": "hello_ack"
+            },
             "payload": {
               "type": "object",
-              "required": ["selected_version"],
+              "required": [
+                "selected_version"
+              ],
               "properties": {
-                "selected_version": { "$ref": "#/$defs/versionString" }
+                "selected_version": {
+                  "$ref": "#/$defs/versionString"
+                }
               },
               "additionalProperties": true
             }
@@ -182,25 +408,49 @@
     },
     "status": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "status" },
+            "type": {
+              "const": "status"
+            },
             "payload": {
               "type": "object",
-              "required": ["state", "error_code", "telemetry"],
+              "required": [
+                "state",
+                "error_code",
+                "state_revision",
+                "telemetry"
+              ],
               "properties": {
                 "state": {
                   "type": "string",
-                  "enum": ["offline", "ready", "engaged", "manual_override", "fault"]
+                  "enum": [
+                    "ready",
+                    "engaged",
+                    "manual_override",
+                    "fault"
+                  ]
                 },
                 "error_code": {
                   "anyOf": [
-                    { "type": "null" },
-                    { "$ref": "#/$defs/errorCode" }
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/$defs/errorCode"
+                    }
                   ]
                 },
-                "telemetry": { "$ref": "#/$defs/telemetrySummary" }
+                "telemetry": {
+                  "$ref": "#/$defs/telemetrySummary"
+                },
+                "state_revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               },
               "additionalProperties": true
             }
@@ -210,15 +460,23 @@
     },
     "configMessage": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "config" },
+            "type": {
+              "const": "config"
+            },
             "payload": {
               "type": "object",
-              "required": ["config"],
+              "required": [
+                "config"
+              ],
               "properties": {
-                "config": { "$ref": "#/$defs/config" }
+                "config": {
+                  "$ref": "#/$defs/config"
+                }
               },
               "additionalProperties": true
             }
@@ -228,17 +486,29 @@
     },
     "log": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "log" },
+            "type": {
+              "const": "log"
+            },
             "payload": {
               "type": "object",
-              "required": ["level", "message_key", "args"],
+              "required": [
+                "level",
+                "message_key",
+                "args"
+              ],
               "properties": {
                 "level": {
                   "type": "string",
-                  "enum": ["info", "warning", "error"]
+                  "enum": [
+                    "info",
+                    "warning",
+                    "error"
+                  ]
                 },
                 "message_key": {
                   "type": "string",
@@ -246,8 +516,23 @@
                 },
                 "args": {
                   "type": "object",
+                  "$comment": "String values are limited here; application logic also limits serialized non-string scalars to 256 characters and rejects sensitive values.",
                   "additionalProperties": {
-                    "type": ["string", "number", "boolean", "null"]
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 256
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 }
               },
@@ -259,21 +544,34 @@
     },
     "error": {
       "allOf": [
-        { "$ref": "#/$defs/base" },
+        {
+          "$ref": "#/$defs/base"
+        },
         {
           "properties": {
-            "type": { "const": "error" },
+            "type": {
+              "const": "error"
+            },
             "payload": {
               "type": "object",
-              "required": ["code"],
+              "required": [
+                "code"
+              ],
               "properties": {
-                "code": { "$ref": "#/$defs/errorCode" }
+                "code": {
+                  "$ref": "#/$defs/errorCode"
+                }
               },
               "additionalProperties": true
             }
           }
         }
       ]
+    },
+    "idString": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,64}$",
+      "description": "UI request ids begin u-; Python-initiated event ids begin p-. Responses reuse the request id. Prefix policy is enforced by application logic."
     }
   }
 }

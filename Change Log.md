@@ -15,5 +15,7 @@ All notable changes to this project are documented here and published on the pro
 - Agent signature in `AGENTS.md` set to `OpenAI-Codex_Responsible: Source_Code`; reporting format added. (Anthropic-Claude_Code)
 - Linked the architecture IPC table to the shared contract specifications. (OpenAI-Codex_Responsible: Source_Code)
 - Applied verified SDK channel names and coordinate conventions to the telemetry contract; steering is positive left. (OpenAI-Codex_Responsible: Source_Code)
+- Hardened IPC specifications for seqlock ordering, 4096-byte mapping ownership and latest-callback validity, writer restart, overlapped pipe I/O and peer validation, control status state machine, UI parsing and state_revision, and moving_backward hysteresis. (OpenAI-Codex_Responsible: Source_Code)
+- Removed MPL-2.0 from the dependency license-check allow-list. (OpenAI-Codex_Responsible: Source_Code)
 
 <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
