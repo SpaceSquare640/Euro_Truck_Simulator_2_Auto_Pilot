@@ -15,7 +15,7 @@ Each v1.0 command is exactly 64 bytes. The header contains packet_size so a late
 | 12 | 4 | reserved_header | uint32 | — | 0 |
 | 16 | 8 | sequence | uint64 | count | Strictly increasing within a connection, starting at 1 |
 | 24 | 8 | timestamp_ns | uint64 | ns | QPC-derived monotonic command creation time |
-| 32 | 8 | steering | float64 | ratio | Finite, [-1,1]; negative left, positive right |
+| 32 | 8 | steering | float64 | ratio | Finite, [-1,1]; positive left (counterclockwise), negative right |
 | 40 | 8 | throttle | float64 | ratio | Finite, [0,1] |
 | 48 | 8 | brake | float64 | ratio | Finite, [0,1] |
 | 56 | 1 | engage | uint8 | boolean | 0 or 1 |
@@ -27,6 +27,7 @@ The receiver rejects an unknown major, bad size or magic, nonzero reserved bytes
 ## Output limits and override
 
 Both Python and native/input clamp the command range and independently limit continuous output changes by maximum absolute change per elapsed second. The receiver uses its monotonic elapsed time between accepted packets, not an assumed packet rate. Initial output after engagement starts at zero.
+native/input translates this steering convention to the virtual controller's axis direction.
 
 | Output | Suggested maximum change per second | Status |
 |---|---:|---|

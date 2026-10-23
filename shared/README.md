@@ -11,9 +11,10 @@ Status: v1.0 draft. This directory is the contract between the native, Python, a
 ## Common representation
 
 - The supported platform is Windows 10/11 x64. Binary integers and IEEE 754 binary64 values use little-endian byte order. Binary structures use 8-byte packing. Protocol booleans are uint8 values 0 or 1, never a language-native bool.
-- Physical quantities use SI units: m, m/s, rad, rad/s, and s. Normalized controls use [0,1] or [-1,1]. Engine angular speed is rad/s; an SDK RPM value, if confirmed, must be converted by 2π/60.
+- Physical quantities use SI units: m, m/s, rad, rad/s, and s. Normalized controls use [0,1] or [-1,1]. Engine angular speed is rad/s; SDK RPM is converted by 2π/60.
 - A timestamp is an unsigned 64-bit integer count of nanoseconds from the machine's monotonic QueryPerformanceCounter (QPC) clock, using its reported frequency for conversion. It is not Unix time. The JSON representation is a base-10 string to avoid integer precision loss. Values are comparable only on the same Windows boot.
-- The world frame follows the SCS Telemetry SDK frame. Offline axis candidate: +X east, +Y up, +Z south (right-handed); the world origin is game-defined. **[VERIFY]** Claude must confirm the axis directions against the official SCS Telemetry SDK documentation before implementation. World-space vector components and orientation in telemetry use this frame.
+- The world frame follows the SCS Telemetry SDK frame: +X east, +Y up, +Z south (right-handed), as confirmed against the official SCS Telemetry SDK 1.16 headers. The local vehicle frame is +X right, +Y up, +Z back; the world origin is game-defined. Telemetry placement uses the world frame, while linear and angular velocity use the local frame.
+- Steering and angles use counterclockwise as positive. Positive steering turns left; native/input translates this convention to the virtual controller axis.
 - Any value that cannot be produced or validated is marked unavailable by the channel-specific validity mechanism. Zero is not a substitute for a valid reading.
 
 ## Versions and extensions
