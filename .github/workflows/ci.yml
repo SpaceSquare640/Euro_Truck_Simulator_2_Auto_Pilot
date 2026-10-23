@@ -1,4 +1,5 @@
 # Edited by: Anthropic-Claude_Code
+# Edited by: OpenAI-Codex_Responsible: Source_Code
 # Each module job runs only when its directory exists, so CI can go live before the code does.
 name: CI
 
@@ -24,9 +25,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: d
         run: |
-          echo "native=$([ -f native/CMakeLists.txt ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "python=$([ -f python/pyproject.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "ui=$(ls ui/*.sln ui/*.slnx 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          native=false
+          python=false
+          ui=false
+          if [ -f native/CMakeLists.txt ]; then native=true; fi
+          if [ -f python/pyproject.toml ]; then python=true; fi
+          for f in ui/*.sln ui/*.slnx; do
+            if [ -f "$f" ]; then ui=true; break; fi
+          done
+          {
+            echo "native=$native"
+            echo "python=$python"
+            echo "ui=$ui"
+          } >> "$GITHUB_OUTPUT"
 
   native:
     needs: detect

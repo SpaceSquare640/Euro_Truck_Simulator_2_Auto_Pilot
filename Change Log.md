@@ -19,5 +19,6 @@ All notable changes to this project are documented here and published on the pro
 - Hardened IPC specifications for seqlock ordering, 4096-byte mapping ownership and latest-callback validity, writer restart, overlapped pipe I/O and peer validation, control status state machine, UI parsing and state_revision, and moving_backward hysteresis. (OpenAI-Codex_Responsible: Source_Code)
 - Removed MPL-2.0 from the dependency license-check allow-list. (OpenAI-Codex_Responsible: Source_Code)
 - Release and Sync Docs workflows use least-privilege permissions; Change Log.md is validated before it is synced to the website; releases are restricted to tags on Source_Code; `generate_release_notes` is no longer used. (OpenAI-Codex_Responsible: Source_Code)
+- CI module detection no longer uses `ls | grep` and writes its outputs in one block, which fixes the Actionlint shellcheck findings. (OpenAI-Codex_Responsible: Source_Code)
 
 <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
