@@ -1,6 +1,18 @@
 ---
 // Edited by: OpenAI-Codex_Responsible: Website
 import { t } from "../i18n";
+
+function splitNodeLabel(label: string): string[] {
+  const separator = label.indexOf(" (");
+  return separator === -1
+    ? [label]
+    : [label.slice(0, separator), label.slice(separator + 1)];
+}
+
+const pluginLines = splitNodeLabel(t("architecture.node.plugin"));
+const coreLines = splitNodeLabel(t("architecture.node.core"));
+const inputLines = splitNodeLabel(t("architecture.node.input"));
+const uiLines = splitNodeLabel(t("architecture.node.ui"));
 ---
 
 <div class="diagram-desktop">
@@ -29,23 +41,35 @@ import { t } from "../i18n";
 
   <g class="node">
     <rect x="25" y="105" width="255" height="85" rx="12" />
-    <text x="152" y="155" text-anchor="middle">{t("architecture.node.game")}</text>
+    <text x="152" y="154" text-anchor="middle">{t("architecture.node.game")}</text>
   </g>
   <g class="node">
     <rect x="355" y="105" width="250" height="85" rx="12" />
-    <text x="480" y="155" text-anchor="middle">{t("architecture.node.plugin")}</text>
+    <text x="480" text-anchor="middle">
+      <tspan x="480" y="143">{pluginLines[0]}</tspan>
+      <tspan x="480" y="167">{pluginLines[1]}</tspan>
+    </text>
   </g>
   <g class="node">
     <rect x="680" y="105" width="255" height="85" rx="12" />
-    <text x="807" y="155" text-anchor="middle">{t("architecture.node.core")}</text>
+    <text x="807" text-anchor="middle">
+      <tspan x="807" y="143">{coreLines[0]}</tspan>
+      <tspan x="807" y="167">{coreLines[1]}</tspan>
+    </text>
   </g>
   <g class="node">
     <rect x="680" y="470" width="255" height="85" rx="12" />
-    <text x="807" y="520" text-anchor="middle">{t("architecture.node.input")}</text>
+    <text x="807" text-anchor="middle">
+      <tspan x="807" y="508">{inputLines[0]}</tspan>
+      <tspan x="807" y="532">{inputLines[1]}</tspan>
+    </text>
   </g>
   <g class="node">
     <rect x="355" y="470" width="250" height="85" rx="12" />
-    <text x="480" y="520" text-anchor="middle">{t("architecture.node.ui")}</text>
+    <text x="480" text-anchor="middle">
+      <tspan x="480" y="508">{uiLines[0]}</tspan>
+      <tspan x="480" y="532">{uiLines[1]}</tspan>
+    </text>
   </g>
 </svg>
 </div>
@@ -98,7 +122,7 @@ import { t } from "../i18n";
 
   .node text {
     fill: var(--text);
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
   }
 
