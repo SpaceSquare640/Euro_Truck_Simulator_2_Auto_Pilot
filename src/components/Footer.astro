@@ -14,4 +14,7 @@ const { locale = "en" } = Astro.props;
     {t("footer.copyrightPrefix", locale)}<a href={t("footer.licenseHref", locale)}>{t("footer.licenseName", locale)}</a>
   </p>
   <p>{t("footer.notAffiliated", locale)}</p>
+  <nav aria-label={t("footer.navLabel", locale)}>
+    <a href={`${import.meta.env.BASE_URL}en/#credits`}>{t("footer.creditsLink", locale)}</a>
+  </nav>
 </footer>

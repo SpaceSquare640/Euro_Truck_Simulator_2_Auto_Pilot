@@ -1,0 +1,52 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import { t } from "../i18n";
+---
+
+<section class="content-section" id="credits" aria-labelledby="credits-heading">
+  <h2 class="section-heading" id="credits-heading">{t("credits.title")}</h2>
+  <p>{t("credits.intro")}</p>
+  <ul class="outline-list">
+    <li>
+      <strong>{t("credits.kingsley.name")}</strong>
+      <p>{t("credits.kingsley.role")}</p>
+    </li>
+    <li>
+      <strong>{t("credits.claude.name")}</strong>
+      <p>{t("credits.claude.role")}</p>
+    </li>
+    <li>
+      <strong>{t("credits.codex.name")}</strong>
+      <p>{t("credits.codex.role")}</p>
+    </li>
+    <li>
+      <strong>{t("credits.bots.name")}</strong>
+      <p>{t("credits.bots.role")}</p>
+      <ul class="bot-list">
+        <li>{t("credits.bots.githubActions")}</li>
+        <li>{t("credits.bots.dependabot")}</li>
+      </ul>
+    </li>
+  </ul>
+  <p class="credits-disclaimer">{t("credits.disclaimer")}</p>
+</section>
+
+<style>
+  /* Edited by: OpenAI-Codex_Responsible: Website */
+  .bot-list {
+    margin: 0.6rem 0 0;
+    padding-left: 1.5rem;
+    color: var(--muted);
+  }
+
+  .bot-list li {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .credits-disclaimer {
+    margin-top: 1.5rem;
+    color: var(--muted);
+  }
+</style>
