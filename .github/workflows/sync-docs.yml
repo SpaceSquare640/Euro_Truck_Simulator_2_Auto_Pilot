@@ -1,4 +1,5 @@
 # Edited by: Anthropic-Claude_Code
+# Edited by: OpenAI-Codex_Responsible: Source_Code
 # Publishes Change Log.md to the website branch, then triggers the Pages deployment.
 # Pushes made with GITHUB_TOKEN do not trigger other workflows, so the deploy is dispatched explicitly.
 name: Sync Docs to Website
@@ -10,8 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: write
+  contents: read
 
 concurrency:
   group: sync-docs
@@ -24,6 +24,9 @@ env:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,6 +35,8 @@ jobs:
         with:
           ref: ${{ env.WEBSITE_BRANCH }}
           path: website
+      - name: Validate Change Log
+        run: bash source/.github/scripts/validate-changelog.sh "source/Change Log.md"
       - name: Copy Change Log
         run: |
           mkdir -p "website/$(dirname "$TARGET_PATH")"

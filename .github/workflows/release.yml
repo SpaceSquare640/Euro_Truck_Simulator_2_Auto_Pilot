@@ -1,20 +1,118 @@
 # Edited by: Anthropic-Claude_Code
-# Skeleton: creates a GitHub Release for version tags. Build/package steps are added once modules are buildable.
+# Edited by: OpenAI-Codex_Responsible: Source_Code
+# Builds a GitHub Release from the matching section of Change Log.md.
+# A pushed v* tag publishes. A manual run is a preview only and never publishes.
+# TODO: when native / python / ui packages exist, build them in separate jobs with contents: read
+# and keep contents: write on the publish job only.
 name: Release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Preview only (nothing is published): x.y.z[-prerelease] or Unreleased"
+        required: true
+        default: "Unreleased"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      EVENT_NAME: ${{ github.event_name }}
+      REF_NAME: ${{ github.ref_name }}
+      INPUT_VERSION: ${{ github.event.inputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # TODO: build native / python / ui and attach packages as release assets.
-      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          generate_release_notes: true
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: v
+        run: |
+          set -euo pipefail
+          pattern='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+          if [ "$EVENT_NAME" = "push" ]; then
+            TAG="$REF_NAME"
+            printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
+              || { echo "::error::Tag is not vMAJOR.MINOR.PATCH[-prerelease]"; exit 1; }
+            VERSION="${TAG#v}"
+            PUBLISH=true
+          else
+            TAG=""
+            VERSION="$INPUT_VERSION"
+            if [ "$VERSION" != "Unreleased" ]; then
+              printf '%s' "$VERSION" | grep -Eq "$pattern" \
+                || { echo "::error::Invalid version input"; exit 1; }
+            fi
+            PUBLISH=false
+          fi
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "publish=$PUBLISH"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Require the tagged commit to be on Source_Code
+        if: steps.v.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/Source_Code \
+            || { echo "::error::Tagged commit is not on Source_Code"; exit 1; }
+
+      - name: Extract release notes from Change Log.md
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          bash .github/scripts/extract-release-notes.sh "$VERSION" "Change Log.md" > "$RUNNER_TEMP/notes.md"
+          echo "notes lines: $(wc -l < "$RUNNER_TEMP/notes.md")"
+
+      - name: Compose release body
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -n "$TAG" ]; then
+            PREV="$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)"
+            if [ -n "$PREV" ]; then
+              LINK="https://github.com/${GITHUB_REPOSITORY}/compare/${PREV}...${TAG}"
+            else
+              LINK="https://github.com/${GITHUB_REPOSITORY}/commits/${TAG}"
+            fi
+          else
+            LINK="(preview, no tag)"
+          fi
+          {
+            cat "$RUNNER_TEMP/notes.md"
+            printf '\n\n## Contributors\n- Kingsley\n- Anthropic Claude Code\n- OpenAI Codex\n- Bots: github-actions[bot], dependabot[bot]\n\n**Full Changelog**: %s\n' "$LINK"
+          } > "$RUNNER_TEMP/release-body.md"
+          echo "body lines: $(wc -l < "$RUNNER_TEMP/release-body.md")"
+
+      - name: Preview (manual runs never publish)
+        if: steps.v.outputs.publish != 'true'
+        run: |
+          {
+            echo '### Release notes preview'
+            echo
+            cat "$RUNNER_TEMP/release-body.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish GitHub Release
+        if: steps.v.outputs.publish == 'true'
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          name: ${{ steps.v.outputs.tag }}
+          body_path: ${{ runner.temp }}/release-body.md
+          prerelease: ${{ contains(steps.v.outputs.version, '-') }}
