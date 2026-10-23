@@ -58,6 +58,12 @@ and an in-browser simulator. All project READMEs link here.
 - Website CI runs `check:deps` to enforce lockfile integrity and the dependency license policy.
 - Every check must report its actual nonzero number of files, pages, links, workflows, packages, or tests inspected. A zero count must fail instead of reporting success.
 
+## Test temporary files
+- Tests that create temporary directories must use a unique prefix under `os.tmpdir()` and register cleanup immediately after creation with `t.after` or `finally`.
+- A test may delete only directories it created during that same test run, after validating each target path.
+- Do not add switches or environment variables that skip test cleanup.
+- This exception applies only to those test-owned temporary directories. Any other deletion still requires two separate confirmations.
+
 ## Signature
 - Add `Edited by: OpenAI-Codex_Responsible: Website` in a comment for files you create or modify.
 
