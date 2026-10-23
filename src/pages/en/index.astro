@@ -2,6 +2,7 @@
 // Edited by: OpenAI-Codex_Responsible: Website
 import Base from "../../layouts/Base.astro";
 import Credits from "../../components/Credits.astro";
+import StatusBanner from "../../components/StatusBanner.astro";
 import { t } from "../../i18n";
 
 const baseUrl = import.meta.env.BASE_URL;
@@ -28,6 +29,8 @@ const links = [
       <a class="button button-secondary" href={`${baseUrl}en/simulator/`}>{t("home.secondaryAction")}</a>
     </div>
   </section>
+
+  <StatusBanner />
 
   <section class="content-section" aria-labelledby="features-heading">
     <h2 class="section-heading" id="features-heading">{t("home.featuresHeading")}</h2>

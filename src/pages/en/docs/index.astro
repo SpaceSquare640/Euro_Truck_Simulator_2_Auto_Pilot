@@ -4,16 +4,15 @@ import Base from "../../../layouts/Base.astro";
 import { t } from "../../../i18n";
 
 const sections = [
-  { title: t("docs.sectionOneTitle"), body: t("docs.sectionOneBody") },
-  { title: t("docs.sectionTwoTitle"), body: t("docs.sectionTwoBody") },
-  { title: t("docs.sectionThreeTitle"), body: t("docs.sectionThreeBody") },
-  { title: t("docs.sectionFourTitle"), body: t("docs.sectionFourBody") },
+  { title: t("docs.overviewHeading"), body: t("docs.overviewBody"), state: t("label.planned") },
+  { title: t("docs.requirementsHeading"), body: t("docs.requirementsBody"), state: t("label.planned") },
+  { title: t("docs.installHeading"), body: t("docs.installBody"), state: t("label.notAvailable") },
+  { title: t("docs.troubleshootingHeading"), body: t("docs.troubleshootingBody"), state: t("label.planned") },
 ];
 ---
 
 <Base title={t("docs.title")} description={t("docs.description")}>
   <section aria-labelledby="docs-heading">
-    <p class="eyebrow">{t("docs.comingSoon")}</p>
     <h1 class="page-heading" id="docs-heading">{t("docs.heading")}</h1>
     <p class="page-intro">{t("docs.intro")}</p>
     <ol class="outline-list">
@@ -21,9 +20,17 @@ const sections = [
         <li>
           <h2>{section.title}</h2>
           <p>{section.body}</p>
-          <span class="status-label">{t("docs.comingSoon")}</span>
+          <span class="status-label">{section.state}</span>
         </li>
       ))}
     </ol>
+  </section>
+
+  <section class="content-section" aria-labelledby="docs-more-heading">
+    <h2 class="section-heading" id="docs-more-heading">{t("docs.moreHeading")}</h2>
+    <ul class="outline-list">
+      <li><a href={`${import.meta.env.BASE_URL}en/docs/architecture/`}>{t("docs.architectureLink")}</a></li>
+      <li><a href={`${import.meta.env.BASE_URL}en/docs/status/`}>{t("docs.statusLink")}</a></li>
+    </ul>
   </section>
 </Base>

@@ -1,0 +1,94 @@
+---
+// Edited by: OpenAI-Codex_Responsible: Website
+import { t } from "../i18n";
+---
+
+<svg role="img" aria-labelledby="architecture-diagram-title architecture-diagram-desc" viewBox="0 0 960 690">
+  <title id="architecture-diagram-title">{t("architecture.diagramTitle")}</title>
+  <desc id="architecture-diagram-desc">{t("architecture.diagramDesc")}</desc>
+  <defs>
+    <marker id="architecture-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 1 1 L 10 6 L 1 11 Z" />
+    </marker>
+  </defs>
+
+  <path class="connection" d="M 280 148 H 350" marker-end="url(#architecture-arrow)" />
+  <path class="connection" d="M 605 148 H 675" marker-end="url(#architecture-arrow)" />
+  <path class="connection" d="M 810 190 V 465" marker-end="url(#architecture-arrow)" />
+  <path class="connection" d="M 810 555 V 620 H 150 V 195" marker-end="url(#architecture-arrow)" />
+  <path class="connection" d="M 690 190 L 590 465" marker-end="url(#architecture-arrow)" />
+  <path class="connection" d="M 605 465 L 705 190" marker-end="url(#architecture-arrow)" />
+
+  <text class="edge-label" x="315" y="75" text-anchor="middle">{t("architecture.edge.sdk")}</text>
+  <text class="edge-label" x="640" y="75" text-anchor="middle">{t("architecture.edge.shm")}</text>
+  <text class="edge-label" x="842" y="330" text-anchor="middle" transform="rotate(-90 842 330)">{t("architecture.edge.controlPipe")}</text>
+  <text class="edge-label" x="480" y="655" text-anchor="middle">{t("architecture.edge.virtual")}</text>
+  <rect class="edge-label-background" x="405" y="330" width="310" height="32" rx="6" />
+  <text class="edge-label" x="560" y="352" text-anchor="middle">{t("architecture.edge.uiPipe")}</text>
+
+  <g class="node">
+    <rect x="25" y="105" width="255" height="85" rx="12" />
+    <text x="152" y="155" text-anchor="middle">{t("architecture.node.game")}</text>
+  </g>
+  <g class="node">
+    <rect x="355" y="105" width="250" height="85" rx="12" />
+    <text x="480" y="155" text-anchor="middle">{t("architecture.node.plugin")}</text>
+  </g>
+  <g class="node">
+    <rect x="680" y="105" width="255" height="85" rx="12" />
+    <text x="807" y="155" text-anchor="middle">{t("architecture.node.core")}</text>
+  </g>
+  <g class="node">
+    <rect x="680" y="470" width="255" height="85" rx="12" />
+    <text x="807" y="520" text-anchor="middle">{t("architecture.node.input")}</text>
+  </g>
+  <g class="node">
+    <rect x="355" y="470" width="250" height="85" rx="12" />
+    <text x="480" y="520" text-anchor="middle">{t("architecture.node.ui")}</text>
+  </g>
+</svg>
+
+<style>
+  /* Edited by: OpenAI-Codex_Responsible: Website */
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: 0.85rem;
+    background: var(--surface);
+    font-family: inherit;
+  }
+
+  .connection {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 3;
+  }
+
+  marker path {
+    fill: var(--accent);
+  }
+
+  .node rect {
+    fill: var(--surface-raised);
+    stroke: var(--accent);
+    stroke-width: 2;
+  }
+
+  .node text {
+    fill: var(--text);
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .edge-label-background {
+    fill: var(--surface);
+  }
+
+  .edge-label {
+    fill: var(--text);
+    font-size: 18px;
+    font-weight: 650;
+  }
+</style>
