@@ -51,6 +51,13 @@ and an in-browser simulator. All project READMEs link here.
 - Keep Astro on the 7.x line; the pinned project version is 7.4.2.
 - Keep TypeScript on the 6.x line; `@astrojs/check` 0.9.12 declares a TypeScript peer range of `^5 || ^6`, so TypeScript 7.x is incompatible.
 
+## Automation
+- Website Guard rejects forbidden tracked paths, unauthorized Change Log edits, and workflow actions that are not pinned to commit SHAs.
+- Website Link Check checks built HTML links against the Pages base path, target files, and named anchors.
+- Website Actionlint checks workflow syntax after workflow changes.
+- Website CI runs `check:deps` to enforce lockfile integrity and the dependency license policy.
+- Every check must report its actual nonzero number of files, pages, links, workflows, packages, or tests inspected. A zero count must fail instead of reporting success.
+
 ## Signature
 - Add `Edited by: OpenAI-Codex_Responsible: Website` in a comment for files you create or modify.
 
