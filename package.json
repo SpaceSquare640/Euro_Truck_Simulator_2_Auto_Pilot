@@ -8,12 +8,13 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "test:scripts": "node --test scripts/*.test.mjs",
+    "check:deps": "node scripts/check-lockfile.mjs && node scripts/check-licenses.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
     "astro": "7.4.2",
-    "license-checker": "25.0.1",
     "typescript": "6.0.3"
   }
 }
