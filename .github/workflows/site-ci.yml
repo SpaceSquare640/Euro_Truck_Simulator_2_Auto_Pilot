@@ -23,7 +23,7 @@ jobs:
         run: npm run check
       - name: Build static site
         run: npm run build
-      - name: Check production dependency licenses
-        run: >-
-          npx license-checker --production --excludePrivatePackages --onlyAllow
-          "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;Python-2.0"
+      - name: Test dependency policy scripts
+        run: npm run test:scripts
+      - name: Check lockfile integrity and dependency licenses
+        run: npm run check:deps

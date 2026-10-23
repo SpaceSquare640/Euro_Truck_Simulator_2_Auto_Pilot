@@ -1,0 +1,33 @@
+{
+  "allowed": [
+    "MIT",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "0BSD",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "Unlicense",
+    "Python-2.0"
+  ],
+  "buildTimeExceptions": [
+    {
+      "namePattern": "@img/sharp-*",
+      "licenses": [
+        "LGPL-3.0-or-later",
+        "Apache-2.0 AND LGPL-3.0-or-later",
+        "Apache-2.0 AND LGPL-3.0-or-later AND MIT"
+      ],
+      "reason": "Optional native image binaries (sharp/libvips); build-time only, unmodified, not distributed"
+    },
+    {
+      "namePattern": "lightningcss*",
+      "licenses": [
+        "MPL-2.0"
+      ],
+      "reason": "CSS tooling used by Vite at build time; unmodified, not distributed"
+    }
+  ],
+  "noLicenseExceptions": []
+}
