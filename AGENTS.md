@@ -40,12 +40,23 @@ and an in-browser simulator. All project READMEs link here.
 - Commit directly to this branch (no PR gate). Every push runs CI; commits are reviewed after the fact.
 - Before each commit: build locally if changed, confirm no secrets or confidential paths are staged.
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `style:`, `ci:`, `chore:`.
-- License: CC BY-NC-SA 4.0, copyright Kingsley. Dependencies must be MIT / BSD / Apache-2.0 / ISC.
+- License: CC BY-NC-SA 4.0, copyright Kingsley.
+
+## Dependency Policy
+- Runtime dependencies must use one of the licenses in the `allowed` list in [scripts/license-policy.json](scripts/license-policy.json).
+- Build-time-only dev dependencies may use a non-allowlisted license only through an exact package-name and license-string exception in [scripts/license-policy.json](scripts/license-policy.json). They must remain unmodified and must not be distributed.
+- Keep the exception list explicit. Do not broaden the allowlist or exceptions to make a failed check pass.
+
+### Dependency Notes
+- Keep Astro on the 7.x line; the pinned project version is 7.4.2.
+- Keep TypeScript on the 6.x line; `@astrojs/check` 0.9.12 declares a TypeScript peer range of `^5 || ^6`, so TypeScript 7.x is incompatible.
 
 ## Signature
 - Add `Edited by: OpenAI-Codex_Responsible: Website` in a comment for files you create or modify.
 
 ## Reporting
-- Every report must be a single copyable ```text block starting with `[REPORT] OpenAI-Codex_Responsible: Website`, with fields: Task, Status, Changed files, Commits, Verification, Issues / Questions.
+- Every report must be a single copyable ```text block starting with `[REPORT] OpenAI-Codex_Responsible: Website`, with fields: Task, Status, Changed files, Commits, Skills used, Verification, Issues / Questions.
+- Status may be `Done` only after every acceptance condition has been verified. Include actual numeric check outputs, including the dependency count and exception counts.
 
+<!-- Edited by: OpenAI-Codex_Responsible: Website -->
 <!-- Edited by: Anthropic-Claude_Code -->
