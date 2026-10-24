@@ -1,0 +1,5 @@
+; Edited by: OpenAI-Codex_Responsible: Source_Code
+LIBRARY ets2ap_plugin
+EXPORTS
+    scs_telemetry_init
+    scs_telemetry_shutdown

@@ -1,0 +1,6 @@
+# Edited by: OpenAI-Codex_Responsible: Source_Code
+add_library(ets2ap_test_support INTERFACE)
+target_include_directories(ets2ap_test_support INTERFACE include)
+add_executable(test_framework_selftest tests/selftest.cpp)
+target_link_libraries(test_framework_selftest PRIVATE ets2ap_test_support)
+add_test(NAME test_framework_selftest COMMAND test_framework_selftest)
