@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="AppTitle" xml:space="preserve"><value>ETS2 Auto Pilot</value></data>
+  <data name="Overview" xml:space="preserve"><value>Overview</value></data>
+  <data name="Setup" xml:space="preserve"><value>Setup</value></data>
+  <data name="Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="Activity" xml:space="preserve"><value>Activity</value></data>
+  <data name="DrivingOverview" xml:space="preserve"><value>Driving overview</value></data>
+  <data name="OverviewDescription" xml:space="preserve"><value>Monitor your drive and control the auto pilot.</value></data>
+  <data name="NotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="NotConnectedDetail" xml:space="preserve"><value>Set up the connection to see live data.</value></data>
+  <data name="SetUpConnection" xml:space="preserve"><value>Set up connection</value></data>
+  <data name="DrivingInformation" xml:space="preserve"><value>Driving information</value></data>
+  <data name="Speed" xml:space="preserve"><value>Speed</value></data>
+  <data name="SpeedLimit" xml:space="preserve"><value>Speed limit</value></data>
+  <data name="DistanceRemaining" xml:space="preserve"><value>Distance remaining</value></data>
+  <data name="Eta" xml:space="preserve"><value>ETA</value></data>
+  <data name="Kmh" xml:space="preserve"><value>km/h</value></data>
+  <data name="ConnectionChecklist" xml:space="preserve"><value>Connection checklist</value></data>
+  <data name="Game" xml:space="preserve"><value>Game</value></data>
+  <data name="Connector" xml:space="preserve"><value>Connector</value></data>
+  <data name="ControlService" xml:space="preserve"><value>Control service</value></data>
+  <data name="Pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="Engage" xml:space="preserve"><value>Engage auto pilot</value></data>
+  <data name="EngageUnavailable" xml:space="preserve"><value>Available when the game and control service are ready.</value></data>
+  <data name="RecentActivity" xml:space="preserve"><value>Recent activity</value></data>
+  <data name="NoRecentActivity" xml:space="preserve"><value>No recent activity</value></data>
+  <data name="ActivityAfterConnect" xml:space="preserve"><value>Activity will appear here after the control service connects.</value></data>
+  <data name="DriverPriority" xml:space="preserve"><value>Driver input always takes priority.</value></data>
+  <data name="Theme" xml:space="preserve"><value>Theme</value></data>
+  <data name="SystemTheme" xml:space="preserve"><value>System</value></data>
+  <data name="LightTheme" xml:space="preserve"><value>Light</value></data>
+  <data name="DarkTheme" xml:space="preserve"><value>Dark</value></data>
+  <data name="SetupTitle" xml:space="preserve"><value>Set up connection</value></data>
+  <data name="SetupDescription" xml:space="preserve"><value>Prepare the game connector and control service before driving.</value></data>
+  <data name="GameFolder" xml:space="preserve"><value>Game folder</value></data>
+  <data name="Browse" xml:space="preserve"><value>Browse...</value></data>
+  <data name="NoFolderSelected" xml:space="preserve"><value>No game folder selected.</value></data>
+  <data name="FolderAccepted" xml:space="preserve"><value>Game folder found.</value></data>
+  <data name="FolderInvalid" xml:space="preserve"><value>Choose the Euro Truck Simulator 2 folder containing bin\win_x64\eurotrucks2.exe.</value></data>
+  <data name="ConnectorInstallation" xml:space="preserve"><value>Game connector</value></data>
+  <data name="ConnectorInstallationDescription" xml:space="preserve"><value>The connector lets this external app read game telemetry. Installation will be offered with the complete app package.</value></data>
+  <data name="InstallConnector" xml:space="preserve"><value>Install connector</value></data>
+  <data name="ConnectorUnavailable" xml:space="preserve"><value>Connector installation is unavailable in this build.</value></data>
+  <data name="ServiceUnavailable" xml:space="preserve"><value>The control service is not included in this build.</value></data>
+  <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
+  <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>
+  <data name="ThemeDescription" xml:space="preserve"><value>Choose a theme or follow your Windows setting.</value></data>
+  <data name="HighContrastNote" xml:space="preserve"><value>Windows high contrast settings always take priority.</value></data>
+  <data name="Language" xml:space="preserve"><value>Language</value></data>
+  <data name="English" xml:space="preserve"><value>English</value></data>
+  <data name="KeyboardShortcuts" xml:space="preserve"><value>Keyboard shortcuts</value></data>
+  <data name="ShortcutsDescription" xml:space="preserve"><value>Ctrl+1 Overview, Ctrl+2 Setup, Ctrl+3 Settings, Ctrl+4 Activity.</value></data>
+  <data name="ActivityTitle" xml:space="preserve"><value>Activity</value></data>
+  <data name="ActivityDescription" xml:space="preserve"><value>Connection and driving events will appear here.</value></data>
+  <data name="CopyStatus" xml:space="preserve"><value>Copy status</value></data>
+  <data name="StatusCopied" xml:space="preserve"><value>Status copied.</value></data>
+  <data name="AppVersion" xml:space="preserve"><value>Preview UI</value></data>
+  <data name="CurrentPage" xml:space="preserve"><value>Current page</value></data>
+</root>

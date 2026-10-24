@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
+  <SolidColorBrush x:Key="WindowBrush" Color="#F5F7FA" />
+  <SolidColorBrush x:Key="NavigationBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="BorderBrush" Color="#D6DFE8" />
+  <SolidColorBrush x:Key="PrimaryTextBrush" Color="#172B3B" />
+  <SolidColorBrush x:Key="SecondaryTextBrush" Color="#465B6A" />
+  <SolidColorBrush x:Key="AccentBrush" Color="#075B95" />
+  <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="SelectedBrush" Color="#DDEEF9" />
+  <SolidColorBrush x:Key="SelectedTextBrush" Color="#06466F" />
+  <SolidColorBrush x:Key="InfoBrush" Color="#E7F2FA" />
+  <SolidColorBrush x:Key="InfoTextBrush" Color="#06466F" />
+  <SolidColorBrush x:Key="DisabledBrush" Color="#DCE2E8" />
+  <SolidColorBrush x:Key="DisabledTextBrush" Color="#506172" />
+</ResourceDictionary>

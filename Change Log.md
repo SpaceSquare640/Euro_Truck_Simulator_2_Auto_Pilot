@@ -5,6 +5,8 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- Initial .NET 10 WPF desktop UI preview with Overview, Setup, Settings, and Activity screens; localizable English resources, theme preferences, high contrast support, and keyboard navigation. (OpenAI-Codex_Responsible: Source_Code)
+- Refined desktop navigation focus and accessibility labels, and fixed the sidebar footer placement. (OpenAI-Codex_Responsible: Source_Code)
 - Repository initialized: `.gitignore`, README, LICENSE (CC BY-NC-SA 4.0), NOTICE. (Anthropic-Claude_Code)
 - Development guidelines: `AGENTS.md`, `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, task issue template, `.gitattributes`. (Anthropic-Claude_Code)
 - GitHub Actions: secret scan (gitleaks), CI (C++ / Python / .NET 10, auto-skip until modules exist), dependency license check, Change Log sync to website, release skeleton; Dependabot for Actions. (Anthropic-Claude_Code)
