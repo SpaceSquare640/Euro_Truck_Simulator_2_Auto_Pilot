@@ -18,25 +18,37 @@ internal sealed class UiPreferences
         try
         {
             if (File.Exists(SettingsPath))
-            {
-                var preferences = JsonSerializer.Deserialize<UiPreferences>(File.ReadAllText(SettingsPath)) ?? new UiPreferences();
-                if (!Enum.IsDefined(preferences.Theme)) preferences.Theme = ThemeChoice.System;
-                return preferences;
-            }
+                return FromJson(File.ReadAllText(SettingsPath));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // A damaged or inaccessible settings file must not prevent the UI from opening.
         }
         return new UiPreferences();
     }
 
+    internal static UiPreferences FromJson(string json)
+    {
+        try
+        {
+            var preferences = JsonSerializer.Deserialize<UiPreferences>(json) ?? new UiPreferences();
+            if (!Enum.IsDefined(preferences.Theme)) preferences.Theme = ThemeChoice.System;
+            return preferences;
+        }
+        catch (JsonException)
+        {
+            return new UiPreferences();
+        }
+    }
+
+    internal string ToJson() => JsonSerializer.Serialize(this);
+
     public void Save()
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-            File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this));
+            File.WriteAllText(SettingsPath, ToJson());
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

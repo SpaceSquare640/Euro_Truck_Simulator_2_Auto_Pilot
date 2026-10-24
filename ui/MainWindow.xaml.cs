@@ -13,6 +13,7 @@ namespace ETS2AP.Ui;
 public partial class MainWindow : Window
 {
     private readonly UiPreferences _preferences = UiPreferences.Load();
+    private readonly NavigationState _navigation = new();
 
     public MainWindow()
     {
@@ -21,22 +22,27 @@ public partial class MainWindow : Window
         GameFolderText.Text = _preferences.GameFolder ?? string.Empty;
         UpdateFolderStatus();
         ThemeManager.Apply(_preferences.Theme);
-        ShowPage("Overview");
+        ShowPage(UiPage.Overview);
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
         SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
         Closed += Window_Closed;
     }
 
-    private void ShowPage(string page)
+    private void ShowPage(UiPage page)
     {
-        OverviewPage.Visibility = page == "Overview" ? Visibility.Visible : Visibility.Collapsed;
-        SetupPage.Visibility = page == "Setup" ? Visibility.Visible : Visibility.Collapsed;
-        SettingsPage.Visibility = page == "Settings" ? Visibility.Visible : Visibility.Collapsed;
-        ActivityPage.Visibility = page == "Activity" ? Visibility.Visible : Visibility.Collapsed;
+        _navigation.Navigate(page);
+        OverviewPage.Visibility = _navigation.IsSelected(UiPage.Overview) ? Visibility.Visible : Visibility.Collapsed;
+        SetupPage.Visibility = _navigation.IsSelected(UiPage.Setup) ? Visibility.Visible : Visibility.Collapsed;
+        SettingsPage.Visibility = _navigation.IsSelected(UiPage.Settings) ? Visibility.Visible : Visibility.Collapsed;
+        ActivityPage.Visibility = _navigation.IsSelected(UiPage.Activity) ? Visibility.Visible : Visibility.Collapsed;
 
-        foreach (Button button in new[] { OverviewNav, SetupNav, SettingsNav, ActivityNav })
+        foreach (var (button, buttonPage) in new[]
         {
-            bool selected = button.Name.StartsWith(page, StringComparison.Ordinal);
+            (OverviewNav, UiPage.Overview), (SetupNav, UiPage.Setup),
+            (SettingsNav, UiPage.Settings), (ActivityNav, UiPage.Activity)
+        })
+        {
+            bool selected = _navigation.IsSelected(buttonPage);
             button.SetResourceReference(BackgroundProperty, selected ? "SelectedBrush" : "NavigationBrush");
             button.SetResourceReference(ForegroundProperty, selected ? "SelectedTextBrush" : "PrimaryTextBrush");
             AutomationProperties.SetItemStatus(button, selected ? Strings.CurrentPage : string.Empty);
@@ -45,31 +51,23 @@ public partial class MainWindow : Window
         PageScroll.ScrollToTop();
         (page switch
         {
-            "Setup" => SetupHeading,
-            "Settings" => SettingsHeading,
-            "Activity" => ActivityHeading,
+            UiPage.Setup => SetupHeading,
+            UiPage.Settings => SettingsHeading,
+            UiPage.Activity => ActivityHeading,
             _ => OverviewHeading
         }).Focus();
     }
 
-    private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage("Overview");
-    private void Setup_Click(object sender, RoutedEventArgs e) => ShowPage("Setup");
-    private void Settings_Click(object sender, RoutedEventArgs e) => ShowPage("Settings");
-    private void Activity_Click(object sender, RoutedEventArgs e) => ShowPage("Activity");
+    private void Overview_Click(object sender, RoutedEventArgs e) => ShowPage(UiPage.Overview);
+    private void Setup_Click(object sender, RoutedEventArgs e) => ShowPage(UiPage.Setup);
+    private void Settings_Click(object sender, RoutedEventArgs e) => ShowPage(UiPage.Settings);
+    private void Activity_Click(object sender, RoutedEventArgs e) => ShowPage(UiPage.Activity);
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.Control) return;
-        string? page = e.Key switch
-        {
-            Key.D1 or Key.NumPad1 => "Overview",
-            Key.D2 or Key.NumPad2 => "Setup",
-            Key.D3 or Key.NumPad3 => "Settings",
-            Key.D4 or Key.NumPad4 => "Activity",
-            _ => null
-        };
+        UiPage? page = NavigationState.FromShortcut(e.Key, Keyboard.Modifiers);
         if (page is null) return;
-        ShowPage(page);
+        ShowPage(page.Value);
         e.Handled = true;
     }
 

@@ -5,6 +5,7 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- Headless WPF UI checks for localized resources, theme resources and contrast, preferences, and navigation state; CI runs them explicitly. (OpenAI-Codex_Responsible: Source_Code)
 - Initial .NET 10 WPF desktop UI preview with Overview, Setup, Settings, and Activity screens; localizable English resources, theme preferences, high contrast support, and keyboard navigation. (OpenAI-Codex_Responsible: Source_Code)
 - Refined desktop navigation focus and accessibility labels, and fixed the sidebar footer placement. (OpenAI-Codex_Responsible: Source_Code)
 - Repository initialized: `.gitignore`, README, LICENSE (CC BY-NC-SA 4.0), NOTICE. (Anthropic-Claude_Code)

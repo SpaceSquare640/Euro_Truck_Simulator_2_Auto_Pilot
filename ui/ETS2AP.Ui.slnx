@@ -1,4 +1,5 @@
 <Solution>
   <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
   <Project Path="ETS2AP.Ui.csproj" />
+  <Project Path="checks/ETS2AP.Ui.Checks.csproj" />
 </Solution>

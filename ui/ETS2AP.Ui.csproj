@@ -9,4 +9,7 @@
     <AssemblyName>ETS2AP.Ui</AssemblyName>
     <RootNamespace>ETS2AP.Ui</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="checks/**/*.cs" />
+  </ItemGroup>
 </Project>
