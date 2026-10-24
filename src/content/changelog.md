@@ -11,8 +11,11 @@ All notable changes to this project are documented here and published on the pro
 - Versioned v1 IPC specifications for telemetry, control, and UI, including the UI JSON Schema. (OpenAI-Codex_Responsible: Source_Code)
 - Dependabot npm updates targeting the website branch; major updates of typescript and astro are ignored. (OpenAI-Codex_Responsible: Source_Code)
 - Release notes are built from the matching Change Log.md section with a fixed contributors block, a comparison link, and a preview-only manual run; extraction and validation scripts with local tests; Actionlint workflow on Source_Code. (OpenAI-Codex_Responsible: Source_Code)
+- Phase 0 feasibility spike for the SCS SDK Input API (test plugin with scripted input injection, telemetry and timing logs, and an offline host harness) and the vendored SCS SDK 1.16 headers (MIT) in `third_party/scs_sdk`. (OpenAI-Codex_Responsible: Source_Code)
+- Native telemetry writer: `telemetry_core` library (layout, conversions, validity groups, moving_backward hysteresis, seqlock, Windows shared-memory owner), the SCS SDK plugin glue exporting `scs_telemetry_init` and `scs_telemetry_shutdown`, a minimal in-repo test framework, and writer-to-reader round-trip tests. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
+- Retained the SDK log callback by value so telemetry callbacks do not access initialization parameters after init. (OpenAI-Codex_Responsible: Source_Code)
 - Agent signature in `AGENTS.md` set to `OpenAI-Codex_Responsible: Source_Code`; reporting format added. (Anthropic-Claude_Code)
 - Linked the architecture IPC table to the shared contract specifications. (OpenAI-Codex_Responsible: Source_Code)
 - Applied verified SDK channel names and coordinate conventions to the telemetry contract; steering is positive left. (OpenAI-Codex_Responsible: Source_Code)
