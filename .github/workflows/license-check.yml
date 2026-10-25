@@ -9,7 +9,15 @@ on:
       - "python/pyproject.toml"
       - "python/requirements*.txt"
       - "ui/**/*.csproj"
-      - "ui/**/Directory.Packages.props"
+      - "packaging/**/*.wixproj"
+      - "packaging/**/*.csproj"
+      - "**/Directory.Packages.props"
+      - "**/packages.lock.json"
+      - "**/nuget.config"
+      - "**/NuGet.Config"
+      - "**/Directory.Build.props"
+      - "**/Directory.Build.targets"
+      - ".github/scripts/check-nuget-licenses.ps1"
       - ".github/workflows/license-check.yml"
   workflow_dispatch:
 
@@ -40,11 +48,23 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: .NET license check (pending)
-        shell: bash
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore .NET dependency graphs
+        shell: pwsh
         run: |
-          if ls ui/**/*.csproj >/dev/null 2>&1; then
-            echo "::warning::.NET dependency license check is not implemented yet. Review NuGet licenses manually."
-          else
-            echo "No .NET project; skipping."
-          fi
+          dotnet restore ui/ETS2AP.Ui.csproj
+          dotnet restore packaging/windows/ETS2AP.Installer.wixproj
+      - name: Check UI NuGet licenses
+        shell: pwsh
+        run: >-
+          ./.github/scripts/check-nuget-licenses.ps1
+          -AssetsFile ui/obj/project.assets.json
+      - name: Check CI-only WiX NuGet licenses
+        shell: pwsh
+        run: >-
+          ./.github/scripts/check-nuget-licenses.ps1
+          -AssetsFile packaging/windows/obj/project.assets.json
+          -AdditionalPackage WixToolset.Sdk/6.0.2
+          -AllowCiOnlyWixMsRl
