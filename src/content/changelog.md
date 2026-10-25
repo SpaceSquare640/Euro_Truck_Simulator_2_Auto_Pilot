@@ -5,7 +5,7 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
-- Windows x64 release packaging for the WPF app and native connector, with equivalent setup EXE/MSI choices, a versioned connector ZIP, and CI install/uninstall smoke test. (OpenAI-Codex_Responsible: Source_Code)
+- Windows x64 release packaging for the WPF app and native connector, with a versioned connector ZIP, an MSI installer, and a CI install/uninstall smoke test. (OpenAI-Codex_Responsible: Source_Code)
 - Setup can download the published connector ZIP from GitHub, verify the release and DLL digests, and install supported DLLs into the selected ETS2 plugins folder with an elevation prompt and backups. (OpenAI-Codex_Responsible: Source_Code)
 - One-command Phase 0 in-game steering probe with continuous parked-state checks for simple automatic transmission, signed pulse verification, neutral-output acknowledgement, and offline self-test. (OpenAI-Codex_Responsible: Source_Code)
 - Phase 0 probe accepts an explicit output directory and uses fresh telemetry rather than process enumeration to validate game/plugin activity. (OpenAI-Codex_Responsible: Source_Code)
@@ -23,7 +23,6 @@ All notable changes to this project are documented here and published on the pro
 - Native telemetry writer: `telemetry_core` library (layout, conversions, validity groups, moving_backward hysteresis, seqlock, Windows shared-memory owner), the SCS SDK plugin glue exporting `scs_telemetry_init` and `scs_telemetry_shutdown`, a minimal in-repo test framework, and writer-to-reader round-trip tests. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
-- Build the IExpress setup EXE from the release output directory with an explicit working directory and wait for completion before checking the artifact. (OpenAI-Codex_Responsible: Source_Code)
 - Create a per-machine advertised Start Menu shortcut from the installed UI executable, excluding it from wildcard harvesting to avoid duplicate file components. (OpenAI-Codex_Responsible: Source_Code)
 - Fixed PowerShell interpolation of non-ASCII license characters so release packaging succeeds under StrictMode. (OpenAI-Codex_Responsible: Source_Code)
 - License Check now audits .NET packages and uses exact-version MS-RL overrides for the two approved CI-only WiX packages whose NuGet metadata lacks SPDX expressions. (OpenAI-Codex_Responsible: Source_Code)
@@ -42,5 +41,6 @@ All notable changes to this project are documented here and published on the pro
 - Removed MPL-2.0 from the dependency license-check allow-list. (OpenAI-Codex_Responsible: Source_Code)
 - Release and Sync Docs workflows use least-privilege permissions; Change Log.md is validated before it is synced to the website; releases are restricted to tags on Source_Code; `generate_release_notes` is no longer used. (OpenAI-Codex_Responsible: Source_Code)
 - CI module detection no longer uses `ls | grep` and writes its outputs in one block, which fixes the Actionlint shellcheck findings. (OpenAI-Codex_Responsible: Source_Code)
+- Release packages are now the connector ZIP and the MSI installer; the additional installer wrapper was removed because its failures could not be diagnosed. (OpenAI-Codex_Responsible: Source_Code)
 
 <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
