@@ -12,26 +12,21 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="ETS2 Auto Pilot" />
     </StandardDirectory>
-    <StandardDirectory Id="CommonProgramMenuFolder">
-      <Directory Id="ApplicationProgramsFolder" Name="ETS2 Auto Pilot" />
-    </StandardDirectory>
-
     <Feature Id="Main" Title="ETS2 Auto Pilot" Level="1">
       <Files Include="$(var.PublishDirectory)\**" Directory="INSTALLFOLDER">
         <Exclude Files="**\*.pdb" />
+        <Exclude Files="**\ETS2AP.Ui.exe" />
       </Files>
-      <Component Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Guid="*">
-        <Shortcut Id="ApplicationShortcut"
-                  Name="ETS2 Auto Pilot"
-                  Target="[INSTALLFOLDER]ETS2AP.Ui.exe"
-                  WorkingDirectory="INSTALLFOLDER" />
-        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
-        <RegistryValue Root="HKLM"
-                       Key="Software\Kingsley\ETS2 Auto Pilot"
-                       Name="StartMenuShortcut"
-                       Type="integer"
-                       Value="1"
-                       KeyPath="yes" />
+      <Component Id="ApplicationExecutable" Directory="INSTALLFOLDER" Guid="*">
+        <File Id="ApplicationExecutableFile"
+              Source="$(var.PublishDirectory)\ETS2AP.Ui.exe"
+              KeyPath="yes">
+          <Shortcut Id="ApplicationShortcut"
+                    Name="ETS2 Auto Pilot"
+                    Directory="ProgramMenuFolder"
+                    WorkingDirectory="INSTALLFOLDER"
+                    Advertise="yes" />
+        </File>
       </Component>
     </Feature>
 
