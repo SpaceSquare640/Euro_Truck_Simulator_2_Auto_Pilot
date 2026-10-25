@@ -45,6 +45,14 @@ All notable changes to this project are documented here and published on the pro
 
 ## [Unreleased]
 
+### Added
+- The production SCS plugin now registers a semantic steering/forward/brake input device without requiring player-side axis binding; native output starts neutral and fails closed on invalid, disengaged, or stale commands. ETS2 profile mix support remains **[VERIFY]**. (OpenAI-Codex_Responsible: Source_Code)
+- Added a native Control.v1 core for packet validation, status encoding, 100 ms watchdog expiry logic, neutral re-arm, manual-override latching, safety gates, brake priority, and slew limits. The host must schedule `Tick` independently of pipe I/O; braking cuts applied throttle immediately, throttle stays zero until applied brake returns to zero, and a reduced steering cap immediately bounds output. Named Pipe transport and game-control integration remain unavailable. (OpenAI-Codex_Responsible: Source_Code)
+- Added a native plugin host that runs the Control.v1 watchdog every 10 ms independently of command input, publishes only engaged snapshots to the SCS semantic input device, and keeps every non-engaged state neutral. Named Pipe transport, Python commands, and the production manual-input detector remain unconnected. (OpenAI-Codex_Responsible: Source_Code)
+
+### Changed
+- Documented that the semantic input path is not yet connected to a production control pipe or Python controller, so automatic driving remains unavailable. (OpenAI-Codex_Responsible: Source_Code)
+
 ## [0.0.2] - 2026-10-25
 
 ### Changed
