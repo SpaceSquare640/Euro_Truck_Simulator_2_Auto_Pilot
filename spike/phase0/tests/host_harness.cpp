@@ -268,12 +268,21 @@ void case_result(const char* name, int before) {
 void test_script_function() {
     using ets2ap_spike::Mode;
     using ets2ap_spike::evaluate_script;
+    using ets2ap_spike::semantical_float;
     using ets2ap_spike::script_duration;
     const int before = checks;
     const auto steer = [](double t) { return evaluate_script(Mode::steer, t).steering; };
     const auto throttle = [](double t) { return evaluate_script(Mode::throttle, t).throttle; };
     const auto brake = [](double t) { return evaluate_script(Mode::brake, t).brake; };
     const auto button = [](double t) { return evaluate_script(Mode::buttons, t).test_button; };
+    check(semantical_float("steering", evaluate_script(Mode::steer, 3.0)) == 0.5F,
+          "semantic steering maps steering");
+    check(semantical_float("aforward", evaluate_script(Mode::throttle, 3.0)) == 0.3F,
+          "semantic aforward maps throttle");
+    check(semantical_float("abackward", evaluate_script(Mode::brake, 3.0)) == 0.3F,
+          "semantic abackward maps brake");
+    check(semantical_float("unknown", evaluate_script(Mode::steer, 3.0)) == 0.0F,
+          "unknown semantic input is neutral");
     check(steer(0.0) == 0.0F, "script steer at 0");
     check(steer(2.0) == 0.5F, "script steer at 2");
     check(steer(4.999) == 0.5F, "script steer before 5");
@@ -281,8 +290,10 @@ void test_script_function() {
     check(steer(7.0) == -0.5F, "script steer at 7");
     check(steer(10.0) == 0.0F, "script steer at 10");
     check(steer(12.0) == 0.0F, "script steer at 12");
+    check(steer(12.39) == 0.0F && std::fabs(static_cast<double>(steer(12.4)) - 0.1) < 1e-6,
+          "script steer ramp holds each step");
     check(std::fabs(static_cast<double>(steer(14.0)) - 0.5) < 1e-9, "script steer at 14");
-    check(steer(15.999) >= 0.99F, "script steer near 16");
+    check(steer(15.999) >= 0.9F, "script steer near 16");
     check(steer(16.0) == 0.0F, "script steer at 16");
     check(steer(18.0) == 0.0F && script_duration(Mode::steer) == 18.0,
           "script steer ends at 18");
@@ -322,7 +333,7 @@ void test_scripts() {
     const int before = checks;
     CaseDirectory dir("T4 directory created");
     if (!dir.valid) return;
-    dir.write("config.txt", "devices=generic\nidle=zero\nscript_speed=50\n");
+    dir.write("config.txt", "devices=generic\nidle=zero\nscript_speed=20\n");
     dir.write("mode.txt", "steer 1\n");
     reset();
     auto telemetry = telemetry_params();
@@ -342,13 +353,13 @@ void test_scripts() {
     bool ramp_sample_aligned = false;
     float previous_ramp = 0.0F;
     float max_steering = 0.0F;
-    for (unsigned i = 0; i < 400; ++i) {
+    for (unsigned i = 0; i < 550; ++i) {
         bool align_after_sleep = false;
         std::chrono::steady_clock::time_point ramp_target{};
         const auto frame = input_frame(devices[0], i == 0);
         check(frame.emitted.size() == 4, "T4 four events per frame");
         if (frame.emitted.size() == 4) {
-            const float steering = axis(frame, 0);
+            const float steering = -axis(frame, 0);
             positive |= approximately(steering, 0.5F);
             negative |= approximately(steering, -0.5F);
             peak |= steering >= 0.9F;
@@ -357,11 +368,11 @@ void test_scripts() {
                 previous_ramp = steering;
             }
             if (!ramp_sample_aligned && steering > 0.55F && steering < 0.7F) {
-                // Sleep(2) can be preempted beyond the 8 ms window for >=0.9.
+                // Sleep(2) can be preempted beyond the 20 ms window for >=0.9.
                 // Align one later frame to the middle of that window while
                 // retaining the required two-millisecond sleep per frame.
-                const double script_t = 12.0 + 4.0 * static_cast<double>(steering);
-                const double seconds_until_target = (15.8 - script_t) / 50.0;
+                const double script_t = 12.0 + 4.0 * (static_cast<double>(steering) + 0.05);
+                const double seconds_until_target = (15.8 - script_t) / 20.0;
                 ramp_target = std::chrono::steady_clock::now() +
                     std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                         std::chrono::duration<double>(seconds_until_target));
@@ -418,7 +429,7 @@ void test_scripts() {
     bool restarted = false;
     for (unsigned i = 0; i < 70; ++i) {
         const auto frame = input_frame(devices[0]);
-        restarted |= approximately(axis(frame, 0), 0.5F);
+        restarted |= approximately(axis(frame, 0), -0.5F);
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     check(restarted, "T4 changed token restarts script");
@@ -506,6 +517,12 @@ void test_files() {
         const auto rows = lines(input_files[0]);
         check(rows.size() == 11, "T6 ten input rows");
         if (!rows.empty()) for (const auto& row : rows) check(field_count(row) == field_count(rows[0]), "T6 input CSV width");
+        if (rows.size() > 1) {
+            check(rows[0].find("steering_event_reported") != std::string::npos,
+                  "T6 steering event column");
+            const auto columns = fields(rows[1]);
+            check(!columns.empty() && columns.back() == "1", "T6 generic steering event emitted");
+        }
         std::printf("T6 inputs CSV rows = %zu\n", rows.empty() ? 0 : rows.size() - 1);
     }
     const auto logs = lines(dir.path / "spike.log");
@@ -563,15 +580,35 @@ void test_bad_config() {
         std::string{}, std::string(5000, 'x'), "devices=wrong\nscript_speed=0\nidle=wrong\n",
         std::string("devices=generic\n") + static_cast<char>(0xFF) + "\n"
     };
+    size_t config_index = 0;
     for (const auto& config : configs) {
         dir.write("config.txt", config);
         dir.write("mode.txt", std::string(300, 'x'));
         reset();
         check(api.input_init(SCS_INPUT_VERSION_1_00, &input) == SCS_RESULT_ok,
               "T8 invalid configuration does not abort init");
-        check(devices.size() == 1, "T8 default generic device");
-        if (!devices.empty()) input_frame(devices[0]);
+        const bool generic_only = config_index == 3;
+        check(devices.size() == (generic_only ? 1U : 2U), "T8 default device count");
+        if (generic_only && devices.size() == 1) {
+                check(devices[0].name == "ets2ap_spike", "T8 valid generic setting survives malformed line");
+                check(devices[0].type == SCS_INPUT_DEVICE_TYPE_generic, "T8 retained generic device type");
+                check(devices[0].inputs.size() == 4, "T8 retained generic input count");
+        } else if (!generic_only && devices.size() == 2) {
+                check(devices[0].name == "ets2ap_spike", "T8 default generic device name");
+                check(devices[0].type == SCS_INPUT_DEVICE_TYPE_generic, "T8 default generic device type");
+                check(devices[0].inputs.size() == 4, "T8 default generic input count");
+                check(devices[1].name == "ets2ap_spike_sem", "T8 default semantic device name");
+                check(devices[1].type == SCS_INPUT_DEVICE_TYPE_semantical, "T8 default semantic device type");
+                check(devices[1].inputs.size() == 3, "T8 default semantic input count");
+                if (devices[1].inputs.size() == 3) {
+                    check(devices[1].inputs[0].name == "steering", "T8 default steering mix");
+                    check(devices[1].inputs[1].name == "aforward", "T8 default throttle mix");
+                    check(devices[1].inputs[2].name == "abackward", "T8 default brake mix");
+                }
+        }
+        for (auto& device : devices) input_frame(device);
         api.input_shutdown();
+        ++config_index;
     }
     const auto logs = lines(dir.path / "spike.log");
     bool invalid = false;
@@ -738,6 +775,45 @@ int main(int argc, char** argv) {
         test_registration_errors();
         test_bad_config();
         test_reinit();
+    }
+    if (api.input_init && api.input_shutdown) {
+        const int before = checks;
+        CaseDirectory dir("T11 directory created");
+        if (!dir.valid) { FreeLibrary(library); return 1; }
+        reset();
+        auto params = input_params();
+        check(api.input_init(SCS_INPUT_VERSION_1_00, &params) == SCS_RESULT_ok, "T11 init");
+        check(devices.size() == 2, "T11 default generic and semantic devices");
+        if (devices.size() == 2) {
+            check(devices[0].name == "ets2ap_spike", "T11 generic device name");
+            check(devices[0].type == SCS_INPUT_DEVICE_TYPE_generic, "T11 generic device type");
+            check(devices[1].type == SCS_INPUT_DEVICE_TYPE_semantical, "T11 semantic no-bind type");
+            check(devices[1].inputs.size() == 3, "T11 default registers three control mixes");
+            if (devices[1].inputs.size() == 3) {
+                check(devices[1].inputs[0].name == "steering", "T11 steering mix name");
+                check(devices[1].inputs[1].name == "aforward", "T11 throttle mix name");
+                check(devices[1].inputs[2].name == "abackward", "T11 brake mix name");
+            }
+            if (devices[1].active_callback) devices[1].active_callback(1, devices[1].context);
+            dir.write("mode.txt", "throttle test-1\n");
+            const auto throttle_frame = input_frame(devices[1], true);
+            check(throttle_frame.emitted.size() == 3, "T11 three events");
+            check(approximately(axis(throttle_frame, 0), 0.0F), "T11 steering neutral");
+            check(approximately(axis(throttle_frame, 1), 0.0F), "T11 throttle starts neutral");
+            check(approximately(axis(throttle_frame, 2), 0.0F), "T11 brake neutral");
+        }
+        api.input_shutdown();
+        const auto input_files = matching(dir.path, "inputs_");
+        check(input_files.size() == 1, "T11 input CSV exists");
+        if (!input_files.empty()) {
+            const auto rows = lines(input_files[0]);
+            check(rows.size() >= 2, "T11 input CSV has a frame");
+            if (rows.size() >= 2) {
+                const auto columns = fields(rows[1]);
+                check(!columns.empty() && columns.back() == "1", "T11 semantic steering event emitted");
+            }
+        }
+        case_result("T11", before);
     }
     {
         const int before = checks;

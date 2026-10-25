@@ -5,6 +5,9 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- One-command Phase 0 in-game steering probe with continuous parked-state checks for simple automatic transmission, signed pulse verification, neutral-output acknowledgement, and offline self-test. (OpenAI-Codex_Responsible: Source_Code)
+- Phase 0 probe accepts an explicit output directory and uses fresh telemetry rather than process enumeration to validate game/plugin activity. (OpenAI-Codex_Responsible: Source_Code)
+- Development Python UI status service and WPF named-pipe status display with bounded framing, peer-image checks, and offline protocol checks; engagement remains disabled until native control integration. (OpenAI-Codex_Responsible: Source_Code)
 - Headless WPF UI checks for localized resources, theme resources and contrast, preferences, and navigation state; CI runs them explicitly. (OpenAI-Codex_Responsible: Source_Code)
 - Initial .NET 10 WPF desktop UI preview with Overview, Setup, Settings, and Activity screens; localizable English resources, theme preferences, high contrast support, and keyboard navigation. (OpenAI-Codex_Responsible: Source_Code)
 - Refined desktop navigation focus and accessibility labels, and fixed the sidebar footer placement. (OpenAI-Codex_Responsible: Source_Code)
@@ -18,6 +21,11 @@ All notable changes to this project are documented here and published on the pro
 - Native telemetry writer: `telemetry_core` library (layout, conversions, validity groups, moving_backward hysteresis, seqlock, Windows shared-memory owner), the SCS SDK plugin glue exporting `scs_telemetry_init` and `scs_telemetry_shutdown`, a minimal in-repo test framework, and writer-to-reader round-trip tests. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
+- Hardened the Phase 0 Spike by retaining semantic input descriptors for the device lifetime and logging CSV write failures before disabling the affected stream. (OpenAI-Codex_Responsible: Source_Code)
+- Changed the Phase 0 Spike default to the SCS semantical input device, which maps configured game mixes without a player binding UI; mix support still requires verification per ETS2 profile. (OpenAI-Codex_Responsible: Source_Code)
+- Restored the generic `ETS2AP Spike` device alongside the no-bind semantic device by default, so existing ETS2 profiles recognize the assigned device while semantic input remains available. (OpenAI-Codex_Responsible: Source_Code)
+- Diagnosed the Phase 0 in-game generic steering probe: axis binding is required, and the tested profile maps positive Spike steering to negative game steering. The current source reverses the generic virtual-axis value, identifies polarity mismatches, and steps the ramp to limit the observed callback surge; these fixes still require game verification. (OpenAI-Codex_Responsible: Source_Code)
+- Routed Phase 0 semantical steering, forward, and backward float inputs to their corresponding scripted values and recorded actual steering-event emission; game-side mix names remain unverified. (OpenAI-Codex_Responsible: Source_Code)
 - Retained the SDK log callback by value so telemetry callbacks do not access initialization parameters after init. (OpenAI-Codex_Responsible: Source_Code)
 - Agent signature in `AGENTS.md` set to `OpenAI-Codex_Responsible: Source_Code`; reporting format added. (Anthropic-Claude_Code)
 - Linked the architecture IPC table to the shared contract specifications. (OpenAI-Codex_Responsible: Source_Code)

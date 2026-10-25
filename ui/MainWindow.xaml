@@ -64,8 +64,8 @@
             <DockPanel>
               <Button DockPanel.Dock="Right" Content="{x:Static res:Strings.SetUpConnection}" Click="Setup_Click" Padding="16,9" Margin="16,0,0,0" VerticalAlignment="Center"/>
               <StackPanel>
-                <TextBlock Text="{x:Static res:Strings.NotConnected}" Foreground="{DynamicResource InfoTextBrush}" FontSize="19" FontWeight="SemiBold"/>
-                <TextBlock Text="{x:Static res:Strings.NotConnectedDetail}" Foreground="{DynamicResource InfoTextBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                <TextBlock x:Name="ConnectionTitle" Text="{x:Static res:Strings.NotConnected}" Foreground="{DynamicResource InfoTextBrush}" FontSize="19" FontWeight="SemiBold"/>
+                <TextBlock x:Name="ConnectionDetail" Text="{x:Static res:Strings.NotConnectedDetail}" Foreground="{DynamicResource InfoTextBrush}" TextWrapping="Wrap" Margin="0,5,0,0" AutomationProperties.LiveSetting="Polite"/>
               </StackPanel>
             </DockPanel>
           </Border>
@@ -77,9 +77,9 @@
                 <Grid Margin="0,8,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                  <StackPanel Margin="0,0,0,22"><TextBlock Text="{x:Static res:Strings.Speed}" Style="{StaticResource MutedText}"/><TextBlock Text="--" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="{x:Static res:Strings.Kmh}" Style="{StaticResource MutedText}"/></StackPanel>
-                  <StackPanel Grid.Column="1"><TextBlock Text="{x:Static res:Strings.SpeedLimit}" Style="{StaticResource MutedText}"/><TextBlock Text="--" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="{x:Static res:Strings.Kmh}" Style="{StaticResource MutedText}"/></StackPanel>
-                  <StackPanel Grid.Row="1"><TextBlock Text="{x:Static res:Strings.DistanceRemaining}" Style="{StaticResource MutedText}"/><TextBlock Text="--" FontSize="28" FontWeight="SemiBold"/></StackPanel>
+                  <StackPanel Margin="0,0,0,22"><TextBlock Text="{x:Static res:Strings.Speed}" Style="{StaticResource MutedText}"/><TextBlock x:Name="SpeedValue" Text="--" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="{x:Static res:Strings.Kmh}" Style="{StaticResource MutedText}"/></StackPanel>
+                  <StackPanel Grid.Column="1"><TextBlock Text="{x:Static res:Strings.SpeedLimit}" Style="{StaticResource MutedText}"/><TextBlock x:Name="SpeedLimitValue" Text="--" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="{x:Static res:Strings.Kmh}" Style="{StaticResource MutedText}"/></StackPanel>
+                  <StackPanel Grid.Row="1"><TextBlock Text="{x:Static res:Strings.DistanceRemaining}" Style="{StaticResource MutedText}"/><TextBlock x:Name="DistanceValue" Text="--" FontSize="28" FontWeight="SemiBold"/></StackPanel>
                   <StackPanel Grid.Row="1" Grid.Column="1"><TextBlock Text="{x:Static res:Strings.Eta}" Style="{StaticResource MutedText}"/><TextBlock Text="--" FontSize="28" FontWeight="SemiBold"/></StackPanel>
                 </Grid>
               </StackPanel>
@@ -87,9 +87,9 @@
             <Border Grid.Column="2" Style="{StaticResource Card}">
               <StackPanel>
                 <TextBlock Text="{x:Static res:Strings.ConnectionChecklist}" Style="{StaticResource SectionTitle}"/>
-                <Grid Margin="0,7,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{x:Static res:Strings.Game}"/><TextBlock Grid.Column="1" Text="{x:Static res:Strings.Pending}" Style="{StaticResource MutedText}"/></Grid>
-                <Grid Margin="0,7,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{x:Static res:Strings.Connector}"/><TextBlock Grid.Column="1" Text="{x:Static res:Strings.Pending}" Style="{StaticResource MutedText}"/></Grid>
-                <Grid Margin="0,7,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{x:Static res:Strings.ControlService}"/><TextBlock Grid.Column="1" Text="{x:Static res:Strings.Pending}" Style="{StaticResource MutedText}"/></Grid>
+                <Grid Margin="0,7,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{x:Static res:Strings.Game}"/><TextBlock x:Name="GameCheck" Grid.Column="1" Text="{x:Static res:Strings.Pending}" Style="{StaticResource MutedText}"/></Grid>
+                <Grid Margin="0,7,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{x:Static res:Strings.Connector}"/><TextBlock x:Name="ConnectorCheck" Grid.Column="1" Text="{x:Static res:Strings.Pending}" Style="{StaticResource MutedText}"/></Grid>
+                <Grid Margin="0,7,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{x:Static res:Strings.ControlService}"/><TextBlock x:Name="ControlCheck" Grid.Column="1" Text="{x:Static res:Strings.Pending}" Style="{StaticResource MutedText}"/></Grid>
                 <Button Content="{x:Static res:Strings.Engage}" IsEnabled="False" Padding="12,9"/>
                 <TextBlock Text="{x:Static res:Strings.EngageUnavailable}" Style="{StaticResource MutedText}" Margin="0,9,0,0"/>
               </StackPanel>

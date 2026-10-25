@@ -62,4 +62,21 @@
   <data name="StatusCopied" xml:space="preserve"><value>Status copied.</value></data>
   <data name="AppVersion" xml:space="preserve"><value>Preview UI</value></data>
   <data name="CurrentPage" xml:space="preserve"><value>Current page</value></data>
+  <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
+  <data name="ServiceConnected" xml:space="preserve"><value>Service connected</value></data>
+  <data name="ServiceStatusUnknown" xml:space="preserve"><value>Waiting for a valid service status.</value></data>
+  <data name="Available" xml:space="preserve"><value>Available</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="DistanceKmFormat" xml:space="preserve"><value>{0:N1} km</value></data>
+  <data name="ErrorGameNotRunning" xml:space="preserve"><value>Game is not running.</value></data>
+  <data name="ErrorTelemetryUnavailable" xml:space="preserve"><value>Telemetry is unavailable.</value></data>
+  <data name="ErrorTelemetryStale" xml:space="preserve"><value>Telemetry is out of date.</value></data>
+  <data name="ErrorControlUnavailable" xml:space="preserve"><value>Control service is unavailable. Auto pilot cannot engage.</value></data>
+  <data name="ErrorManualOverride" xml:space="preserve"><value>Driver input has priority.</value></data>
+  <data name="ErrorCommandTimeout" xml:space="preserve"><value>Control command timed out.</value></data>
+  <data name="ErrorInvalidConfig" xml:space="preserve"><value>Configuration value is invalid.</value></data>
+  <data name="ErrorUnsupportedVersion" xml:space="preserve"><value>Service protocol version is unsupported.</value></data>
+  <data name="ErrorMalformedMessage" xml:space="preserve"><value>Service message is invalid.</value></data>
+  <data name="ErrorStaleStatus" xml:space="preserve"><value>Service status is out of date.</value></data>
+  <data name="ErrorInternalError" xml:space="preserve"><value>Service error occurred.</value></data>
 </root>

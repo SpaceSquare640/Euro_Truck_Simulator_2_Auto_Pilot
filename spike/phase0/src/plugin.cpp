@@ -125,9 +125,12 @@ std::string lower(std::string value) {
     return value;
 }
 
+void log_line(const char* level, std::string_view message) noexcept;
+
 struct CsvFile {
     HANDLE handle = INVALID_HANDLE_VALUE;
     std::string pending;
+    const char* label = "CSV";
     std::uint64_t written = 0;
     std::uint64_t last_flush_ns = 0;
     bool limited = false;
@@ -143,8 +146,17 @@ struct CsvFile {
     void flush() noexcept {
         if (handle == INVALID_HANDLE_VALUE || pending.empty()) return;
         DWORD sent = 0;
-        if (!WriteFile(handle, pending.data(), static_cast<DWORD>(pending.size()), &sent, nullptr) ||
-            sent != pending.size()) {
+        const BOOL succeeded = WriteFile(handle, pending.data(), static_cast<DWORD>(pending.size()), &sent, nullptr);
+        const DWORD error = succeeded ? ERROR_SUCCESS : GetLastError();
+        if (!succeeded || sent != pending.size()) {
+            try {
+                std::string message = std::string(label) + (succeeded ? " short write" : " write failed");
+                if (!succeeded) message += " win32_error=" + std::to_string(error);
+                message += " bytes_requested=" +
+                    std::to_string(static_cast<unsigned long long>(pending.size())) +
+                    " bytes_written=" + std::to_string(sent);
+                log_line("ERROR", message);
+            } catch (...) { /* CSV failure reporting must not affect the game. */ }
             CloseHandle(handle);
             handle = INVALID_HANDLE_VALUE;
         } else {
@@ -160,10 +172,14 @@ enum class Idle { zero, silent };
 
 struct SemInput { std::string name; scs_value_type_t type; };
 struct Config {
-    Devices devices = Devices::generic;
+    Devices devices = Devices::both;
     Idle idle = Idle::zero;
     double script_speed = 1.0;
-    std::vector<SemInput> semantical_inputs;
+    std::vector<SemInput> semantical_inputs{
+        {"steering", SCS_VALUE_TYPE_float},
+        {"aforward", SCS_VALUE_TYPE_float},
+        {"abackward", SCS_VALUE_TYPE_float}
+    };
 };
 
 struct TimerStats {
@@ -192,6 +208,7 @@ struct DeviceRuntime {
     unsigned next_index = 0;
     unsigned input_count = 0;
     unsigned events_reported = 0;
+    bool steering_event_reported = false;
     Values values{};
     std::string mode = "off";
     double script_t = 0.0;
@@ -251,6 +268,8 @@ struct State {
     bool input_faulted = false;
     std::uint64_t injection_ns = 0;
     Values injection{};
+    std::vector<std::string> semantical_input_names;
+    std::vector<scs_input_device_input_t> semantical_input_descriptors;
 };
 
 State g;
@@ -490,7 +509,9 @@ void open_session() {
     constexpr char frame_header[] =
         "frame,qpc_ns,render_time_us,sim_time_us,paused_sim_time_us,paused,speed,steer_in,steer_eff,thr_in,thr_eff,brk_in,brk_eff,clu_in,clu_eff,parking_brake,gear_displayed,cruise,rpm,inj_steering,inj_throttle,inj_brake,inj_test_button,inj_age_us\n";
     constexpr char input_header[] =
-        "device,input_frame,qpc_ns,active,mode,script_t_s,steering,throttle,brake,test_button,events_reported\n";
+        "device,input_frame,qpc_ns,active,mode,script_t_s,steering,throttle,brake,test_button,events_reported,steering_event_reported\n";
+    g.frames.label = "frames CSV";
+    g.inputs.label = "inputs CSV";
     for (int attempt = 0; attempt < 30; ++attempt) {
         const auto stamp = local_stamp(true);
         const auto frame_name = join(g.directory, (L"frames_" + stamp + L".csv").c_str());
@@ -618,7 +639,8 @@ void finish_input_row(DeviceRuntime& device) {
         << (device.active_at_frame ? 1 : 0) << ',' << device.mode << ',' << std::setprecision(9)
         << device.script_t << ',' << device.values.steering << ','
         << device.values.throttle << ',' << device.values.brake << ','
-        << (device.values.test_button ? 1 : 0) << ',' << device.events_reported << '\n';
+        << (device.values.test_button ? 1 : 0) << ',' << device.events_reported << ','
+        << (device.steering_event_reported ? 1 : 0) << '\n';
     csv_add(g.inputs, out.str(), "inputs CSV");
     device.pending_row = false;
 }
@@ -635,6 +657,7 @@ void begin_input_frame(DeviceRuntime& device) {
     device.mode = mode_name(g.mode);
     device.next_index = 0;
     device.events_reported = 0;
+    device.steering_event_reported = false;
     device.emit = g.config.idle == Idle::zero || g.mode != Mode::off || device.terminal_zero_pending;
     device.terminal_zero_pending = false;
     device.pending_row = true;
@@ -662,6 +685,7 @@ scs_result_t neutral_event(scs_input_event_t* event_info, scs_u32_t flags,
     if (flags & SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame) {
         device->next_index = 0;
         device->events_reported = 0;
+        device->steering_event_reported = false;
         device->values = {};
         device->pending_row = false;
         ++device->input_frame;
@@ -689,6 +713,11 @@ scs_result_t neutral_event(scs_input_event_t* event_info, scs_u32_t flags,
         return SCS_RESULT_not_found;
     }
     ++device->events_reported;
+    if ((!device->semantical && index == 0) ||
+        (device->semantical && index < g.config.semantical_inputs.size() &&
+         g.config.semantical_inputs[index].name == "steering" &&
+         g.config.semantical_inputs[index].type == SCS_VALUE_TYPE_float))
+        device->steering_event_reported = true;
     return SCS_RESULT_ok;
 }
 
@@ -715,10 +744,12 @@ SCSAPI_RESULT input_event_callback(scs_input_event_t* event_info, scs_u32_t flag
                     const auto& input = g.config.semantical_inputs[index];
                     if (input.type == SCS_VALUE_TYPE_bool)
                         event_info->value_bool.value = device->values.test_button ? 1 : 0;
-                    else event_info->value_float.value = device->values.steering;
+                    else event_info->value_float.value =
+                        ets2ap_spike::semantical_float(input.name, device->values);
                 } else {
                     switch (index) {
-                    case 0: event_info->value_float.value = device->values.steering; break;
+                    // The tested ETS2 generic axis maps its value opposite to the IPC steering convention.
+                    case 0: event_info->value_float.value = -device->values.steering; break;
                     case 1: event_info->value_float.value = device->values.throttle; break;
                     case 2: event_info->value_float.value = device->values.brake; break;
                     case 3: event_info->value_bool.value = device->values.test_button ? 1 : 0; break;
@@ -727,6 +758,10 @@ SCSAPI_RESULT input_event_callback(scs_input_event_t* event_info, scs_u32_t flag
                 }
                 if (index < device->input_count) {
                     device->events_reported++;
+                    if ((!device->semantical && index == 0) ||
+                        (device->semantical && g.config.semantical_inputs[index].name == "steering" &&
+                         g.config.semantical_inputs[index].type == SCS_VALUE_TYPE_float))
+                        device->steering_event_reported = true;
                     result = SCS_RESULT_ok;
                 }
             }
@@ -928,12 +963,19 @@ SCSAPI_RESULT scs_input_init(const scs_u32_t version,
             if (g.config.semantical_inputs.empty()) {
                 log_line("INFO", "semantical_inputs empty; device not registered");
             } else {
-                std::vector<scs_input_device_input_t> inputs;
-                inputs.reserve(g.config.semantical_inputs.size());
+                g.semantical_input_names.clear();
+                g.semantical_input_descriptors.clear();
+                g.semantical_input_names.reserve(g.config.semantical_inputs.size());
+                g.semantical_input_descriptors.reserve(g.config.semantical_inputs.size());
                 for (const auto& item : g.config.semantical_inputs)
-                    inputs.push_back({item.name.c_str(), item.name.c_str(), item.type});
-                if (register_input_device(*init, g.semantical, inputs.data(),
-                    static_cast<scs_u32_t>(inputs.size())) == SCS_RESULT_ok) ++success;
+                    g.semantical_input_names.push_back(item.name);
+                for (std::size_t index = 0; index < g.config.semantical_inputs.size(); ++index) {
+                    const auto& name = g.semantical_input_names[index];
+                    const auto type = g.config.semantical_inputs[index].type;
+                    g.semantical_input_descriptors.push_back({name.c_str(), name.c_str(), type});
+                }
+                if (register_input_device(*init, g.semantical, g.semantical_input_descriptors.data(),
+                    static_cast<scs_u32_t>(g.semantical_input_descriptors.size())) == SCS_RESULT_ok) ++success;
             }
         }
         if (g.config.devices != Devices::none && success == 0) {

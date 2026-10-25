@@ -66,4 +66,20 @@ public static class Strings
     public static string StatusCopied => Get(nameof(StatusCopied));
     public static string AppVersion => Get(nameof(AppVersion));
     public static string CurrentPage => Get(nameof(CurrentPage));
+    public static string ServiceConnected => Get(nameof(ServiceConnected));
+    public static string ServiceStatusUnknown => Get(nameof(ServiceStatusUnknown));
+    public static string Available => Get(nameof(Available));
+    public static string Unavailable => Get(nameof(Unavailable));
+    public static string DistanceKmFormat => Get(nameof(DistanceKmFormat));
+    public static string ErrorGameNotRunning => Get(nameof(ErrorGameNotRunning));
+    public static string ErrorTelemetryUnavailable => Get(nameof(ErrorTelemetryUnavailable));
+    public static string ErrorTelemetryStale => Get(nameof(ErrorTelemetryStale));
+    public static string ErrorControlUnavailable => Get(nameof(ErrorControlUnavailable));
+    public static string ErrorManualOverride => Get(nameof(ErrorManualOverride));
+    public static string ErrorCommandTimeout => Get(nameof(ErrorCommandTimeout));
+    public static string ErrorInvalidConfig => Get(nameof(ErrorInvalidConfig));
+    public static string ErrorUnsupportedVersion => Get(nameof(ErrorUnsupportedVersion));
+    public static string ErrorMalformedMessage => Get(nameof(ErrorMalformedMessage));
+    public static string ErrorStaleStatus => Get(nameof(ErrorStaleStatus));
+    public static string ErrorInternalError => Get(nameof(ErrorInternalError));
 }

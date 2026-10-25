@@ -1,6 +1,7 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 #ifndef ETS2AP_PHASE0_SCRIPT_H
 #define ETS2AP_PHASE0_SCRIPT_H
+#include <string_view>
 
 namespace ets2ap_spike {
 
@@ -28,8 +29,10 @@ constexpr Values evaluate_script(Mode mode, double script_t) noexcept {
     if (mode == Mode::steer) {
         if (script_t >= 2.0 && script_t < 5.0) result.steering = 0.5f;
         else if (script_t >= 7.0 && script_t < 10.0) result.steering = -0.5f;
-        else if (script_t >= 12.0 && script_t < 16.0)
-            result.steering = static_cast<float>((script_t - 12.0) / 4.0);
+        else if (script_t >= 12.0 && script_t < 16.0) {
+            const int step = static_cast<int>((script_t - 12.0) * 2.5);
+            result.steering = static_cast<float>(step) / 10.0f;
+        }
     } else if (mode == Mode::throttle) {
         if (script_t >= 2.0 && script_t < 5.0) result.throttle = 0.3f;
         else if (script_t >= 7.0 && script_t < 10.0) result.throttle = 0.6f;
@@ -41,6 +44,13 @@ constexpr Values evaluate_script(Mode mode, double script_t) noexcept {
             (script_t >= 4.0 && script_t < 5.0) || (script_t >= 7.0 && script_t < 8.0);
     }
     return result;
+}
+
+constexpr float semantical_float(std::string_view name, const Values& values) noexcept {
+    if (name == "steering") return values.steering;
+    if (name == "aforward") return values.throttle;
+    if (name == "abackward") return values.brake;
+    return 0.0f;
 }
 
 } // namespace ets2ap_spike

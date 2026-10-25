@@ -1,5 +1,7 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 using System.Collections;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Globalization;
 using System.Reflection;
 using System.Resources;
@@ -12,14 +14,18 @@ using ETS2AP.Ui.Resources;
 internal static class Program
 {
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--ipc-smoke")
+            return CheckPipeSmoke(args[1]);
         (string Name, Action Run)[] checks =
         [
             ("Localized resources", CheckResources),
             ("Theme resources and contrast", CheckThemes),
             ("Preferences parsing and round trip", CheckPreferences),
-            ("Navigation state and shortcuts", CheckNavigation)
+            ("Navigation state and shortcuts", CheckNavigation),
+            ("UI status protocol", CheckStatusProtocol),
+            ("QPC clock origin", CheckQpcClock)
         ];
 
         int failed = 0;
@@ -38,6 +44,35 @@ internal static class Program
         }
         Console.WriteLine($"UI checks: {checks.Length - failed} passed, {failed} failed");
         return failed == 0 ? 0 : 1;
+    }
+
+    private static int CheckPipeSmoke(string trustedPythonImage)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var client = new UiPipeClient(trustedPythonImage);
+        var observed = new TaskCompletionSource<UiStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.StatusChanged += status =>
+        {
+            if (status is not null) observed.TrySetResult(status);
+        };
+        Task run = client.RunAsync(cancellation.Token);
+        try
+        {
+            UiStatus status = observed.Task.WaitAsync(cancellation.Token).GetAwaiter().GetResult();
+            Require(status.State == "fault", "The development service must not report ready or engaged.");
+            Console.WriteLine($"PASS UI pipe smoke: {status.ErrorCode}");
+            return 0;
+        }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine($"FAIL UI pipe smoke: no valid status within five seconds ({client.LastFailure ?? "none"}).");
+            return 1;
+        }
+        finally
+        {
+            cancellation.Cancel();
+            run.GetAwaiter().GetResult();
+        }
     }
 
     private static void CheckResources()
@@ -130,6 +165,50 @@ internal static class Program
             "A key without Ctrl unexpectedly navigated.");
         Require(NavigationState.FromShortcut(Key.D5, ModifierKeys.Control) is null,
             "An unassigned shortcut unexpectedly navigated.");
+    }
+
+    private static void CheckStatusProtocol()
+    {
+        const string valid = "{\"type\":\"status\",\"version\":\"1.0\",\"id\":\"p-2\",\"timestamp\":\"123\",\"payload\":{\"state\":\"fault\",\"error_code\":\"CONTROL_UNAVAILABLE\",\"state_revision\":0,\"telemetry\":{\"speed_mps\":10,\"speed_limit_mps\":20,\"navigation_distance_m\":1250,\"telemetry_age_s\":0.1}}}";
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(valid);
+        Require(UiStatusProtocol.ReadType(bytes) == "status", "Valid envelope was not parsed.");
+        UiStatus parsed = UiStatusProtocol.ParseStatus(bytes);
+        Require(parsed.SpeedMps == 10 && parsed.ErrorCode == "CONTROL_UNAVAILABLE", "Valid status was not parsed.");
+        Require(Reject(valid.Replace("\"speed_mps\":10", "\"speed_mps\":-1")),
+            "Negative speed was accepted.");
+        Require(Reject(valid.Replace("\"state\":\"fault\"", "\"state\":\"engaged\",\"state\":\"fault\"")),
+            "Duplicate state was accepted.");
+        Require(Reject(valid.Replace("\"speed_mps\":10", "\"speed_mps\":1e999")),
+            "Overflowing number was accepted.");
+    }
+
+    private static void CheckQpcClock()
+    {
+        Require(QueryPerformanceFrequency(out long frequency) && frequency > 0, "QPC frequency unavailable.");
+        Require(QueryPerformanceCounter(out long before), "QPC unavailable.");
+        long observed = System.Diagnostics.Stopwatch.GetTimestamp();
+        Require(QueryPerformanceCounter(out long after), "QPC unavailable.");
+        Require(observed >= before && observed <= after, "Stopwatch does not share the QPC origin.");
+    }
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryPerformanceCounter(out long value);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryPerformanceFrequency(out long value);
+
+    private static bool Reject(string json)
+    {
+        try
+        {
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            _ = UiStatusProtocol.ReadType(bytes);
+            _ = UiStatusProtocol.ParseStatus(bytes);
+            return false;
+        }
+        catch (InvalidDataException) { return true; }
     }
 
     private static double Contrast(Color first, Color second)
