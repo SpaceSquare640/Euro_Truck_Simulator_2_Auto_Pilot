@@ -134,7 +134,7 @@ SourceFiles=SourceFiles
 InstallPrompt=
 DisplayLicense=
 FinishMessage=Installation complete.
-TargetName=$setupPath
+TargetName=$setupName
 FriendlyName=ETS2 Auto Pilot $Version Setup
 AppLaunched=msiexec.exe /i `"$msiName`"
 PostInstallCmd=<None>
@@ -142,7 +142,7 @@ AdminQuietInstCmd=
 UserQuietInstCmd=
 FILE0=`"$msiName`"
 [SourceFiles]
-SourceFiles0=$outputRoot\
+SourceFiles0=$outputRoot
 [SourceFiles0]
 %FILE0%=
 "@
@@ -152,9 +152,14 @@ $iexpress = Join-Path $env:WINDIR 'System32\iexpress.exe'
 if (-not (Test-Path -LiteralPath $iexpress -PathType Leaf)) {
     throw 'Windows IExpress is not available on this build runner.'
 }
-& $iexpress /N /Q $sedPath
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
-    throw "IExpress setup EXE build failed with exit code $LASTEXITCODE."
+$iexpressProcess = Start-Process -FilePath $iexpress `
+    -ArgumentList @('/N', '/Q', "`"$sedPath`"") `
+    -WorkingDirectory $outputRoot `
+    -Wait -PassThru
+if ($iexpressProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $setupPath -PathType Leaf)) {
+    $outputNames = @(Get-ChildItem -LiteralPath $outputRoot -File | Select-Object -ExpandProperty Name)
+    $observedFiles = if ($outputNames.Count -eq 0) { '<none>' } else { $outputNames -join ', ' }
+    throw "IExpress setup EXE build failed with exit code $($iexpressProcess.ExitCode); output files: $observedFiles."
 }
 
 foreach ($asset in @($connectorZip, $msiPath, $setupPath)) {
