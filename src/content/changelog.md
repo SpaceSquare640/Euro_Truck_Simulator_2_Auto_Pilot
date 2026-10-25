@@ -46,6 +46,8 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Changed
+- Set `ETS2AP_TEST_PYTHON` from the configured Python installation for native Control.v1 smoke tests in CI and release builds. (OpenAI-Codex_Responsible: Source_Code)
+- The MSI license text conversion now removes triple-star emphasis markers and rejects leftover asterisks. (OpenAI-Codex_Responsible: Source_Code)
 - The application source code and software use the PolyForm Noncommercial License 1.0.0; website content remains CC BY-NC-SA 4.0 and website source code uses PolyForm Noncommercial License 1.0.0. The connector ZIP carries the SCS SDK MIT notice. (OpenAI-Codex_Responsible: Source_Code)
 
 ## [0.0.3] - 2026-10-25
