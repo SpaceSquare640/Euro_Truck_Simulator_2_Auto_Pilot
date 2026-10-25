@@ -188,9 +188,9 @@ $licenseText = [regex]::Replace($licenseText, '(?m)^\s{0,3}#{1,6}\s+', '')
 $licenseText = [regex]::Replace($licenseText, '<(https?://[^>]+)>', '$1')
 $licenseText = [regex]::Replace($licenseText, '\[([^\]]+)\]\((#[^)]+)\)', '$1')
 $licenseText = [regex]::Replace($licenseText, '\[([^\]]+)\]\(([^)]+)\)', '$1 ($2)')
-$licenseText = $licenseText.Replace('**', '').Replace('__', '').Replace('`', '')
+$licenseText = $licenseText.Replace('***', '').Replace('**', '').Replace('__', '').Replace('`', '')
 $licenseText = [regex]::Replace($licenseText, '(?m)^\s{0,3}>\s?', '')
-if ($licenseText -match '(?m)^\s{0,3}#{1,6}\s|\*\*|__|`|\[[^\]]+\]\([^)]+\)|^\s{0,3}>\s') {
+if ($licenseText -match '(?m)^\s{0,3}#{1,6}\s|\*\*|\*|__|`|\[[^\]]+\]\([^)]+\)|^\s{0,3}>\s') {
     throw 'PolyForm license contains unconverted Markdown in the MSI display text.'
 }
 $escapedLicense = [Text.StringBuilder]::new()

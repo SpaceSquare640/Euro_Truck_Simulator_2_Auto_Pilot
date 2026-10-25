@@ -45,9 +45,17 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
       - run: cmake -S native -B build/native -A x64
       - run: cmake --build build/native --config Release
-      - run: ctest --test-dir build/native -C Release --output-on-failure
+      - name: Run native tests with the Control.v1 Python smoke client
+        shell: pwsh
+        run: |
+          $env:ETS2AP_TEST_PYTHON = (Get-Command python -CommandType Application -ErrorAction Stop).Source
+          if (-not (Test-Path -LiteralPath $env:ETS2AP_TEST_PYTHON -PathType Leaf)) { throw 'Python smoke client executable was not found.' }
+          ctest --test-dir build/native -C Release --output-on-failure
 
   python:
     needs: detect

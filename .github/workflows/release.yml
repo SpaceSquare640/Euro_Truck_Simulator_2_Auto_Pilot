@@ -147,9 +147,12 @@ jobs:
         with:
           python-version: "3.12"
       - name: Build native plugin and run tests
+        shell: pwsh
         run: |
           cmake -S native -B build/native -A x64
           cmake --build build/native --config Release
+          $env:ETS2AP_TEST_PYTHON = (Get-Command python -CommandType Application -ErrorAction Stop).Source
+          if (-not (Test-Path -LiteralPath $env:ETS2AP_TEST_PYTHON -PathType Leaf)) { throw 'Python smoke client executable was not found.' }
           ctest --test-dir build/native -C Release --output-on-failure
       - name: Compile and test Python module
         working-directory: python
