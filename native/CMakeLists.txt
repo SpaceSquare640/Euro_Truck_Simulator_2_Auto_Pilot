@@ -15,7 +15,7 @@ add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
 
 enable_testing()
 add_subdirectory(test_support)
-foreach(module telemetry_core plugin input_core)
+foreach(module telemetry_core input_core plugin)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${module}/CMakeLists.txt")
     add_subdirectory(${module})
   endif()

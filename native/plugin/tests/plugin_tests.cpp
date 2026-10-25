@@ -1,9 +1,12 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 #include "ets2ap/plugin/telemetry_plugin.h"
+#include "ets2ap/plugin/input_plugin.h"
+#include "ets2ap/plugin/control_host.h"
 #include "ets2ap/telemetry/seqlock.h"
 #include "ets2ap/test/test_framework.h"
 
 #include <eurotrucks2/scssdk_eut2.h>
+#include <scssdk_input.h>
 #include <eurotrucks2/scssdk_telemetry_eut2.h>
 #include <windows.h>
 
@@ -17,6 +20,8 @@
 
 namespace {
 using namespace ets2ap::telemetry;
+using ets2ap::plugin::InputPlugin;
+using ets2ap::plugin::InputPluginOptions;
 using ets2ap::plugin::PluginOptions;
 using ets2ap::plugin::TelemetryPlugin;
 
@@ -93,6 +98,39 @@ class FakeSdk {
   }
   scs_telemetry_init_params_v100_t params_{};
   static inline FakeSdk* active_ = nullptr;
+};
+
+struct InputRegistration {
+  scs_input_device_t device{};
+  std::vector<scs_input_device_input_t> inputs;
+};
+
+class FakeInputSdk {
+ public:
+  FakeInputSdk() {
+    active_ = this;
+    params_.common.game_name = "Test game";
+    params_.common.game_id = SCS_GAME_ID_EUT2;
+    params_.register_device = &RegisterDevice;
+  }
+  ~FakeInputSdk() { if (active_ == this) active_ = nullptr; }
+  FakeInputSdk(const FakeInputSdk&) = delete;
+  FakeInputSdk& operator=(const FakeInputSdk&) = delete;
+
+  const scs_input_init_params_v100_t* params() const { return &params_; }
+  InputRegistration registration;
+  scs_result_t result = SCS_RESULT_ok;
+
+ private:
+  static SCSAPI_RESULT RegisterDevice(const scs_input_device_t* device) {
+    if (!active_ || !device) return SCS_RESULT_generic_error;
+    active_->registration.device = *device;
+    active_->registration.inputs.assign(device->inputs, device->inputs + device->input_count);
+    active_->registration.device.inputs = active_->registration.inputs.data();
+    return active_->result;
+  }
+  scs_input_init_params_v100_t params_{};
+  static inline FakeInputSdk* active_ = nullptr;
 };
 
 MappingNames UniqueNames() {
@@ -370,6 +408,99 @@ ETS2AP_TEST(EventClockExceptionReleasesWriterOwnership) {
   CHECK_EQ(second.Init(sdk.params(), Options(names)), SCS_RESULT_ok);
   second.Shutdown();
   first.Shutdown();
+}
+
+ETS2AP_TEST(InputPluginRegistersSemanticMixesWithoutPlayerBinding) {
+  FakeInputSdk sdk;
+  InputPlugin plugin;
+  std::uint64_t now_ns = 1'000'000'000ULL;
+  InputPluginOptions options{};
+  options.now_ns = [&] { return std::optional<std::uint64_t>{now_ns}; };
+
+  CHECK_EQ(plugin.Init(SCS_INPUT_VERSION_1_00, sdk.params(), options), SCS_RESULT_ok);
+  CHECK_EQ(sdk.registration.device.type, SCS_INPUT_DEVICE_TYPE_semantical);
+  CHECK_EQ(std::string(sdk.registration.device.name), std::string("ets2ap_autopilot"));
+  CHECK_EQ(sdk.registration.inputs.size(), std::size_t{3});
+  CHECK_EQ(std::string(sdk.registration.inputs[0].name), std::string("steering"));
+  CHECK_EQ(std::string(sdk.registration.inputs[1].name), std::string("aforward"));
+  CHECK_EQ(std::string(sdk.registration.inputs[2].name), std::string("abackward"));
+  for (const auto& input : sdk.registration.inputs) CHECK_EQ(input.value_type, SCS_VALUE_TYPE_float);
+
+  const auto emit_float = [&](std::uint32_t flags, std::uint32_t index, float expected) {
+    scs_input_event_t event{};
+    CHECK_EQ(sdk.registration.device.input_event_callback(&event, flags,
+        sdk.registration.device.callback_context), SCS_RESULT_ok);
+    CHECK_EQ(event.input_index, index);
+    CHECK_NEAR(event.value_float.value, expected, 0.0001);
+  };
+
+  emit_float(SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame, 0, 0.0f);
+  emit_float(0, 1, 0.0f);
+  emit_float(0, 2, 0.0f);
+  scs_input_event_t exhausted{};
+  CHECK_EQ(sdk.registration.device.input_event_callback(&exhausted, 0,
+      sdk.registration.device.callback_context), SCS_RESULT_not_found);
+
+  CHECK(plugin.SetCommand({0.5f, 0.4f, 0.2f, true, now_ns}));
+  emit_float(SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame, 0, 0.5f);
+  emit_float(0, 1, 0.0f);
+  emit_float(0, 2, 0.2f);
+
+  now_ns += 100'000'000ULL;
+  emit_float(SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame, 0, 0.5f);
+  emit_float(0, 1, 0.0f);
+  emit_float(0, 2, 0.2f);
+  now_ns += 1ULL;
+  emit_float(SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame, 0, 0.0f);
+  emit_float(0, 1, 0.0f);
+  emit_float(0, 2, 0.0f);
+  plugin.Shutdown();
+}
+
+ETS2AP_TEST(InputPluginRejectsUnsafeCommandAndStaysNeutral) {
+  FakeInputSdk sdk;
+  InputPlugin plugin;
+  std::uint64_t now_ns = 5'000'000'000ULL;
+  InputPluginOptions options{};
+  options.now_ns = [&] { return std::optional<std::uint64_t>{now_ns}; };
+  CHECK_EQ(plugin.Init(SCS_INPUT_VERSION_1_00, sdk.params(), options), SCS_RESULT_ok);
+
+  CHECK(!plugin.SetCommand({0.1f, 1.1f, 0.0f, true, now_ns}));
+  scs_input_event_t event{};
+  CHECK_EQ(sdk.registration.device.input_event_callback(&event,
+      SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame, sdk.registration.device.callback_context),
+      SCS_RESULT_ok);
+  CHECK_EQ(event.input_index, 0u);
+  CHECK_NEAR(event.value_float.value, 0.0, 0.0001);
+
+  CHECK(!plugin.SetCommand({0.1f, 0.0f, 0.0f, true, now_ns + 1}));
+  CHECK(!plugin.SetCommand({0.1f, 0.0f, 0.0f, true, now_ns - 100'000'001ULL}));
+  CHECK(!plugin.SetCommand({0.1f, 0.0f, 0.0f, false, now_ns}));
+  CHECK(plugin.SetCommand({0.0f, 0.0f, 0.0f, false, now_ns}));
+  CHECK_EQ(sdk.registration.device.input_event_callback(&event, 0,
+      sdk.registration.device.callback_context), SCS_RESULT_ok);
+  CHECK_NEAR(event.value_float.value, 0.0, 0.0001);
+  CHECK_EQ(sdk.registration.device.input_event_callback(&event, 0,
+      sdk.registration.device.callback_context), SCS_RESULT_ok);
+  CHECK_NEAR(event.value_float.value, 0.0, 0.0001);
+  ++now_ns;
+  CHECK(plugin.SetCommand({0.25f, 0.0f, 0.0f, true, now_ns}));
+  CHECK(!plugin.SetCommand({0.5f, 0.0f, 0.0f, true, now_ns}));
+  CHECK(!plugin.SetCommand({0.5f, 0.0f, 0.0f, true, now_ns - 1}));
+  CHECK_EQ(sdk.registration.device.input_event_callback(&event,
+      SCS_INPUT_EVENT_CALLBACK_FLAG_first_in_frame, sdk.registration.device.callback_context),
+      SCS_RESULT_ok);
+  CHECK_NEAR(event.value_float.value, 0.0, 0.0001);
+  plugin.Shutdown();
+}
+
+ETS2AP_TEST(InputExportsStartAndStopTheControlHost) {
+  FakeInputSdk sdk;
+  CHECK(!ets2ap::plugin::GlobalControlHost().IsRunning());
+  CHECK_EQ(scs_input_init(SCS_INPUT_VERSION_1_00, sdk.params()), SCS_RESULT_ok);
+  CHECK(ets2ap::plugin::GlobalControlHost().IsRunning());
+  scs_input_shutdown();
+  CHECK(!ets2ap::plugin::GlobalControlHost().IsRunning());
 }
 }  // namespace
 
