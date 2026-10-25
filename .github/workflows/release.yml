@@ -103,14 +103,13 @@ jobs:
 
           ## Installation
 
-          Choose one application installer: the setup EXE and the MSI install the same application. Do not install both. The EXE launches the included MSI; the MSI can also be opened directly with Windows Installer.
+          Open the MSI with Windows Installer to install the application.
 
           After installing and launching the app, use **Install connector** to download the versioned connector ZIP from GitHub Releases. The app verifies the release digest and package manifest before installing the DLL into the selected ETS2 plugins folder.
 
           ## Release assets
 
           - `ETS2AP_DLL_V<version>.zip` — game connector downloaded by the app.
-          - `ETS2AP_V<version>_x64-setup.exe` — setup EXE wrapping the MSI.
           - `ETS2AP_V<version>_x64_en-US.msi` — Windows Installer package.
           INSTALL
             printf '\n\n## Contributors\n- Kingsley\n- Anthropic Claude Code\n- OpenAI Codex\n- Bots: github-actions[bot], dependabot[bot]\n\n**Full Changelog**: %s\n' "$LINK"
@@ -161,7 +160,7 @@ jobs:
         run: dotnet publish ui/ETS2AP.Ui.csproj --configuration Release --runtime win-x64 --self-contained true --output build/ui-publish
       - name: Run WPF checks
         run: dotnet run --project ui/checks/ETS2AP.Ui.Checks.csproj --configuration Release
-      - name: Build connector ZIP, MSI, and setup EXE
+      - name: Build connector ZIP and MSI
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
