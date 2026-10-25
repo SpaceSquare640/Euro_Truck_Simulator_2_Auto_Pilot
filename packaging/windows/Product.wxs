@@ -12,7 +12,7 @@
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="ETS2 Auto Pilot" />
     </StandardDirectory>
-    <StandardDirectory Id="ProgramMenuFolder">
+    <StandardDirectory Id="CommonProgramMenuFolder">
       <Directory Id="ApplicationProgramsFolder" Name="ETS2 Auto Pilot" />
     </StandardDirectory>
 
