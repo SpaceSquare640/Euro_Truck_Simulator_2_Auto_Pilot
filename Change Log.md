@@ -45,4 +45,9 @@ All notable changes to this project are documented here and published on the pro
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-10-25
+
+### Changed
+- Clarified live game telemetry, connector, control-service, and ETA availability in the WPF UI; added session-only status activity, screen-reader notifications, copyable diagnostic summaries, and connector installation progress feedback. (OpenAI-Codex_Responsible: Source_Code)
+
 <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->

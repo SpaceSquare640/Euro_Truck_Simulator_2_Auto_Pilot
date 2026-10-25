@@ -1,9 +1,11 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Automation;
@@ -20,12 +22,22 @@ public partial class MainWindow : Window
     private readonly UiPreferences _preferences = UiPreferences.Load();
     private readonly NavigationState _navigation = new();
     private readonly CancellationTokenSource _serviceCancellation = new();
+    private readonly ObservableCollection<ActivityItem> _activityEntries = new();
+    private readonly ObservableCollection<ActivityItem> _recentActivityEntries = new();
     private UiPipeClient? _service;
     private bool _installingConnector;
+    private bool _hasObservedServiceConnection;
+    private bool _serviceConnected;
+    private bool? _lastTelemetryFresh;
+    private string? _lastLoggedState;
+    private string? _lastLoggedErrorCode;
+    private UiStatus? _latestStatus;
 
     public MainWindow()
     {
         InitializeComponent();
+        ActivityList.ItemsSource = _activityEntries;
+        RecentActivityList.ItemsSource = _recentActivityEntries;
         ThemePicker.SelectedIndex = (int)_preferences.Theme;
         GameFolderText.Text = _preferences.GameFolder ?? string.Empty;
         UpdateFolderStatus();
@@ -129,6 +141,7 @@ public partial class MainWindow : Window
 
         _installingConnector = true;
         InstallConnectorButton.IsEnabled = false;
+        InstallProgress.Visibility = Visibility.Visible;
         try
         {
             InstallStatus.Text = Strings.ConnectorInstallElevationPrompt;
@@ -156,6 +169,7 @@ public partial class MainWindow : Window
         finally
         {
             _installingConnector = false;
+            InstallProgress.Visibility = Visibility.Collapsed;
             UpdateFolderStatus();
         }
     }
@@ -183,8 +197,33 @@ public partial class MainWindow : Window
 
     private void CopyStatus_Click(object sender, RoutedEventArgs e)
     {
-        Clipboard.SetText($"{ConnectionTitle.Text}: {ConnectionDetail.Text}");
-        CopyFeedback.Text = Strings.StatusCopied;
+        try
+        {
+            Clipboard.SetText(BuildStatusSnapshot());
+            CopyFeedback.Text = Strings.StatusCopied;
+        }
+        catch (ExternalException)
+        {
+            CopyFeedback.Text = Strings.StatusCopyFailed;
+        }
+    }
+
+    private string BuildStatusSnapshot()
+    {
+        UiStatus? status = _latestStatus;
+        string age = status?.AgeS is double seconds
+            ? string.Format(CultureInfo.CurrentCulture, Strings.TelemetryAgeFormat, seconds)
+            : Strings.NotProvided;
+        return string.Join(Environment.NewLine, new[]
+        {
+            $"{Strings.Connection}: {ConnectionTitle.Text}",
+            $"{Strings.Status}: {ConnectionDetail.Text}",
+            $"{Strings.AutomationState}: {(status is null ? Strings.OfflineState : StateDescription(status.State))}",
+            $"{Strings.TelemetryAge}: {age}",
+            $"{Strings.Speed}: {SpeedValue.Text} {Strings.Kmh}",
+            $"{Strings.SpeedLimit}: {SpeedLimitValue.Text} {Strings.Kmh}",
+            $"{Strings.DistanceRemaining}: {DistanceValue.Text}"
+        });
     }
 
     private void StartServiceConnection()
@@ -210,26 +249,103 @@ public partial class MainWindow : Window
 
     private void ApplyStatus(UiStatus? status)
     {
+        _latestStatus = status;
         if (status is null)
         {
+            RecordStatus(null, telemetryFresh: false);
             ConnectionTitle.Text = Strings.NotConnected;
             UpdateConnectionDetail(Strings.NotConnectedDetail);
             SpeedValue.Text = SpeedLimitValue.Text = DistanceValue.Text = "--";
-            GameCheck.Text = ConnectorCheck.Text = ControlCheck.Text = Strings.Pending;
+            GameCheck.Text = ConnectorCheck.Text = Strings.Pending;
+            ControlCheck.Text = Strings.Unavailable;
+            AutomationStateValue.Text = Strings.OfflineState;
             return;
         }
 
         ConnectionTitle.Text = Strings.ServiceConnected;
-        UpdateConnectionDetail(ErrorDescription(status.ErrorCode));
+        AutomationStateValue.Text = StateDescription(status.State);
         bool fresh = status.AgeS is <= 0.25 && status.SpeedMps is not null;
+        RecordStatus(status, fresh);
+        string? errorCode = status.ErrorCode;
+        if (errorCode is null && !fresh)
+            errorCode = status.AgeS is null || status.SpeedMps is null
+                ? "TELEMETRY_UNAVAILABLE"
+                : "TELEMETRY_STALE";
+        UpdateConnectionDetail(errorCode is null
+            ? StateDescription(status.State)
+            : ErrorDescription(errorCode));
         SpeedValue.Text = fresh ? FormatKmh(status.SpeedMps) : "--";
         SpeedLimitValue.Text = fresh ? FormatKmh(status.SpeedLimitMps) : "--";
         DistanceValue.Text = fresh && status.DistanceM is double distance
             ? string.Format(CultureInfo.CurrentCulture, Strings.DistanceKmFormat, distance / 1000.0)
             : "--";
-        GameCheck.Text = fresh ? Strings.Available : Strings.Pending;
-        ConnectorCheck.Text = fresh ? Strings.Available : Strings.Pending;
-        ControlCheck.Text = status.ErrorCode == "CONTROL_UNAVAILABLE" ? Strings.Unavailable : Strings.Pending;
+        GameCheck.Text = status.ErrorCode == "GAME_NOT_RUNNING"
+            ? Strings.Unavailable
+            : fresh ? Strings.Available : Strings.Pending;
+        ConnectorCheck.Text = fresh
+            ? Strings.Available
+            : status.ErrorCode is "TELEMETRY_UNAVAILABLE" or "TELEMETRY_STALE"
+                ? Strings.Unavailable
+                : Strings.Pending;
+        ControlCheck.Text = Strings.Unavailable;
+    }
+
+    private void RecordStatus(UiStatus? status, bool telemetryFresh)
+    {
+        bool connected = status is not null;
+        if (connected && (!_hasObservedServiceConnection || !_serviceConnected))
+            AddActivity(Strings.ActivityServiceConnected);
+        else if (!connected && _hasObservedServiceConnection && _serviceConnected)
+            AddActivity(Strings.ActivityServiceDisconnected);
+        _hasObservedServiceConnection = true;
+        _serviceConnected = connected;
+
+        if (status is null)
+        {
+            _lastTelemetryFresh = false;
+            _lastLoggedState = null;
+            _lastLoggedErrorCode = null;
+            AnnounceActivityUpdate();
+            return;
+        }
+
+        if (_lastTelemetryFresh != telemetryFresh)
+            AddActivity(telemetryFresh ? Strings.ActivityTelemetryAvailable : Strings.ActivityTelemetryUnavailable);
+        _lastTelemetryFresh = telemetryFresh;
+
+        if (!string.Equals(_lastLoggedState, status.State, StringComparison.Ordinal))
+            AddActivity(string.Format(CultureInfo.CurrentCulture, Strings.ActivityStateChangedFormat,
+                StateDescription(status.State)));
+        _lastLoggedState = status.State;
+
+        if (!string.IsNullOrEmpty(status.ErrorCode) &&
+            !string.Equals(_lastLoggedErrorCode, status.ErrorCode, StringComparison.Ordinal))
+            AddActivity(string.Format(CultureInfo.CurrentCulture, Strings.ActivityIssueFormat,
+                ErrorDescription(status.ErrorCode)));
+        _lastLoggedErrorCode = status.ErrorCode;
+        AnnounceActivityUpdate();
+    }
+
+    private void AddActivity(string message)
+    {
+        var entry = new ActivityItem(DateTime.Now.ToString("t", CultureInfo.CurrentCulture), message);
+        _activityEntries.Insert(0, entry);
+        _recentActivityEntries.Insert(0, entry);
+        while (_activityEntries.Count > 50) _activityEntries.RemoveAt(_activityEntries.Count - 1);
+        while (_recentActivityEntries.Count > 3) _recentActivityEntries.RemoveAt(_recentActivityEntries.Count - 1);
+        ActivityEmpty.Visibility = Visibility.Collapsed;
+        RecentActivityEmpty.Visibility = Visibility.Collapsed;
+    }
+
+    private void AnnounceActivityUpdate()
+    {
+        ItemsControl? liveRegion = _navigation.IsSelected(UiPage.Activity)
+            ? ActivityList
+            : _navigation.IsSelected(UiPage.Overview) ? RecentActivityList : null;
+        if (liveRegion is null) return;
+        var peer = UIElementAutomationPeer.FromElement(liveRegion)
+            ?? UIElementAutomationPeer.CreatePeerForElement(liveRegion);
+        peer?.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     private static string FormatKmh(double? speedMps) => speedMps is double speed
@@ -260,4 +376,16 @@ public partial class MainWindow : Window
         "INTERNAL_ERROR" => Strings.ErrorInternalError,
         _ => Strings.ServiceStatusUnknown
     };
+
+    private static string StateDescription(string state) => state switch
+    {
+        "ready" => Strings.StateReady,
+        "engaged" => Strings.StateEngaged,
+        "manual_override" => Strings.StateManualOverride,
+        "fault" => Strings.StateFault,
+        _ => Strings.ServiceStatusUnknown
+    };
 }
+
+// Edited by: OpenAI-Codex_Responsible: Source_Code
+internal sealed record ActivityItem(string Time, string Message);
