@@ -23,7 +23,7 @@ All notable changes to this project are documented here and published on the pro
 - Native telemetry writer: `telemetry_core` library (layout, conversions, validity groups, moving_backward hysteresis, seqlock, Windows shared-memory owner), the SCS SDK plugin glue exporting `scs_telemetry_init` and `scs_telemetry_shutdown`, a minimal in-repo test framework, and writer-to-reader round-trip tests. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
-- License Check now triggers for packaging dependency manifests and audits restored .NET and CI-only WiX NuGet licenses with a narrowly scoped MS-RL exception. (OpenAI-Codex_Responsible: Source_Code)
+- License Check now audits .NET packages and uses exact-version MS-RL overrides for the two approved CI-only WiX packages whose NuGet metadata lacks SPDX expressions. (OpenAI-Codex_Responsible: Source_Code)
 - Connector installation locks the selected local directory chain, rejects reparse points, verifies persistent backups, and restores through a fresh temporary file. (OpenAI-Codex_Responsible: Source_Code)
 - Enabled Python CI for the existing package and tests without installing unused development dependencies. (OpenAI-Codex_Responsible: Source_Code)
 - Hardened the Phase 0 Spike by retaining semantic input descriptors for the device lifetime and logging CSV write failures before disabling the affected stream. (OpenAI-Codex_Responsible: Source_Code)

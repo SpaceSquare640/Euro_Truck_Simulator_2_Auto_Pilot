@@ -18,6 +18,13 @@ foreach ($license in @('MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', 'Zli
     [void]$allowedLicenses.Add($license)
 }
 
+# Kingsley approved MS-RL for these exact WiX build packages in CI only.
+# Their nuspecs omit SPDX expressions; future versions do not inherit this exception.
+$approvedCiOnlyLicenseOverrides = @{
+    'wixtoolset.sdk/6.0.2' = 'MS-RL'
+    'wixtoolset.ui.wixext/6.0.2' = 'MS-RL'
+}
+
 function Remove-OuterParentheses {
     param([Parameter(Mandatory = $true)][string]$Expression)
 
@@ -92,6 +99,7 @@ function Test-LicenseExpression {
     param(
         [Parameter(Mandatory = $true)][string]$Expression,
         [Parameter(Mandatory = $true)][string]$PackageId,
+        [Parameter(Mandatory = $true)][string]$Version,
         [Parameter(Mandatory = $true)][bool]$AllowWixMsRl
     )
 
@@ -101,7 +109,7 @@ function Test-LicenseExpression {
     $orParts = Split-TopLevelOperator $value 'OR'
     if ($orParts.Count -gt 1) {
         foreach ($part in $orParts) {
-            if (Test-LicenseExpression $part $PackageId $AllowWixMsRl) { return $true }
+            if (Test-LicenseExpression $part $PackageId $Version $AllowWixMsRl) { return $true }
         }
         return $false
     }
@@ -109,16 +117,17 @@ function Test-LicenseExpression {
     $andParts = Split-TopLevelOperator $value 'AND'
     if ($andParts.Count -gt 1) {
         foreach ($part in $andParts) {
-            if (-not (Test-LicenseExpression $part $PackageId $AllowWixMsRl)) { return $false }
+            if (-not (Test-LicenseExpression $part $PackageId $Version $AllowWixMsRl)) { return $false }
         }
         return $true
     }
 
     if ($value -match '\s+WITH\s+') { return $false }
     if ($allowedLicenses.Contains($value)) { return $true }
+    $identity = ('{0}/{1}' -f $PackageId, $Version).ToLowerInvariant()
     return $AllowWixMsRl -and
-        $PackageId.StartsWith('WixToolset.', [System.StringComparison]::OrdinalIgnoreCase) -and
-        $value -eq 'MS-RL'
+        $approvedCiOnlyLicenseOverrides.ContainsKey($identity) -and
+        $approvedCiOnlyLicenseOverrides[$identity] -eq $value
 }
 
 function Get-PackageLicense {
@@ -154,16 +163,30 @@ function Get-PackageLicense {
         return
     }
     $licenseNode = $metadata.SelectSingleNode("*[local-name()='license']")
+    $identity = ('{0}/{1}' -f $PackageId, $Version).ToLowerInvariant()
+    $overrideUsed = $false
     if ($null -eq $licenseNode -or $licenseNode.GetAttribute('type') -ne 'expression') {
-        $script:failures.Add("${PackageId}/${Version}: package does not declare a machine-readable SPDX license expression.")
-        return
+        if ($AllowWixMsRl -and $approvedCiOnlyLicenseOverrides.ContainsKey($identity)) {
+            $expression = $approvedCiOnlyLicenseOverrides[$identity]
+            $overrideUsed = $true
+        }
+        else {
+            $script:failures.Add("${PackageId}/${Version}: package does not declare a machine-readable SPDX license expression.")
+            return
+        }
+    }
+    else {
+        $expression = $licenseNode.InnerText.Trim()
     }
 
-    $expression = $licenseNode.InnerText.Trim()
     try {
-        if (Test-LicenseExpression $expression $PackageId $AllowWixMsRl) {
-            if ($AllowWixMsRl -and $PackageId.StartsWith('WixToolset.', [System.StringComparison]::OrdinalIgnoreCase) -and $expression -match '(^|\s)MS-RL(\s|$)') {
-                Write-Host "ALLOW (CI-only approved WiX MS-RL): $PackageId/$Version ($expression)"
+        if (Test-LicenseExpression $expression $PackageId $Version $AllowWixMsRl) {
+            if ($overrideUsed) {
+                Write-Host "ALLOW (pre-approved CI-only WiX metadata override): $PackageId/$Version ($expression)"
+            }
+            elseif ($AllowWixMsRl -and $approvedCiOnlyLicenseOverrides.ContainsKey($identity) -and
+                $approvedCiOnlyLicenseOverrides[$identity] -eq $expression -and $expression -eq 'MS-RL') {
+                Write-Host "ALLOW (pre-approved CI-only WiX MS-RL): $PackageId/$Version ($expression)"
             }
             else {
                 Write-Host "ALLOW: $PackageId/$Version ($expression)"
