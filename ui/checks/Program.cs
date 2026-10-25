@@ -1,5 +1,6 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 using System.Collections;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.IO;
@@ -32,6 +33,8 @@ internal static class Program
             ("Preferences parsing and round trip", CheckPreferences),
             ("Navigation state and shortcuts", CheckNavigation),
             ("UI status protocol", CheckStatusProtocol),
+            ("Raw input safety state", CheckRawInputSafetyState),
+            ("Perception frame protocol", CheckPerceptionFrameProtocol),
             ("Bundled Python service launch and restart policy", CheckPythonServiceLaunchConfiguration),
             ("Connector release metadata", CheckConnectorReleaseMetadata),
             ("Connector release download", CheckConnectorReleaseDownload),
@@ -179,6 +182,26 @@ internal static class Program
             "An unassigned shortcut unexpectedly navigated.");
     }
 
+    private static void CheckPerceptionFrameProtocol()
+    {
+        byte[] rgb = new byte[PerceptionFramePublisher.PixelBytes];
+        byte[] packet = PerceptionFramePublisher.CreatePacket(rgb, 1_000_000_000,
+            PerceptionFrameFlags.GameFocused | PerceptionFrameFlags.FrameValid, 2);
+        Require(packet.Length == PerceptionFramePublisher.PacketSize, "Perception frame size differs from v1.");
+        Require(Encoding.ASCII.GetString(packet, 0, 4) == "E2PF", "Perception magic is invalid.");
+        Require(BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(8)) == 64,
+            "Perception header size is invalid.");
+        Require(BinaryPrimitives.ReadUInt64LittleEndian(packet.AsSpan(16)) == 2,
+            "Perception seqlock sequence is invalid.");
+        Require(BinaryPrimitives.ReadUInt64LittleEndian(packet.AsSpan(24)) == 1_000_000_000,
+            "Perception timestamp is invalid.");
+        Require(BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(40)) == rgb.Length,
+            "Perception payload size is invalid.");
+        Require(packet.AsSpan(44, 20).IndexOfAnyExcept((byte)0) < 0,
+            "Perception reserved bytes must be zero.");
+        Require(packet.AsSpan(64).SequenceEqual(rgb), "Perception RGB payload changed.");
+    }
+
     private static void CheckStatusProtocol()
     {
         const string valid = "{\"type\":\"status\",\"version\":\"1.0\",\"id\":\"p-2\",\"timestamp\":\"123\",\"payload\":{\"state\":\"fault\",\"error_code\":\"CONTROL_UNAVAILABLE\",\"state_revision\":0,\"telemetry\":{\"speed_mps\":10,\"speed_limit_mps\":20,\"navigation_distance_m\":1250,\"telemetry_age_s\":0.1}}}";
@@ -192,6 +215,29 @@ internal static class Program
             "Duplicate state was accepted.");
         Require(Reject(valid.Replace("\"speed_mps\":10", "\"speed_mps\":1e999")),
             "Overflowing number was accepted.");
+
+        const string perception = "{\"type\":\"status\",\"version\":\"1.1\",\"id\":\"p-3\",\"timestamp\":\"124\",\"payload\":{\"state\":\"fault\",\"error_code\":\"CONTROL_UNAVAILABLE\",\"state_revision\":0,\"telemetry\":{\"speed_mps\":10,\"speed_limit_mps\":20,\"navigation_distance_m\":1250,\"telemetry_age_s\":0.1},\"perception\":{\"frame_valid\":true,\"frame_age_s\":0.04,\"game_focused\":true,\"input_monitor_healthy\":false,\"manual_input_active\":false,\"lane_confidence\":0.8,\"front_clear\":null}}}";
+        UiStatus withPerception = UiStatusProtocol.ParseStatus(Encoding.UTF8.GetBytes(perception));
+        Require(withPerception.Perception is { FrameValid: true, GameFocused: true,
+                InputMonitorHealthy: false, ManualInputActive: false, LaneConfidence: 0.8,
+                FrontClear: null },
+            "UI v1.1 perception safety state was not preserved.");
+    }
+
+    private static void CheckRawInputSafetyState()
+    {
+        const uint leftButtonDown = 0x0001;
+        const uint leftButtonUp = 0x0002;
+        uint buttons = InputMonitorSafety.ApplyMouseButtonFlags(0, leftButtonDown);
+        Require(buttons == leftButtonDown, "Mouse down was not retained.");
+        buttons = InputMonitorSafety.ApplyMouseButtonFlags(buttons, leftButtonUp);
+        Require(buttons == 0, "Mouse up did not clear its matching down state.");
+        Require(!InputMonitorSafety.IsHealthy(true, true, false, false),
+            "API health alone must not authorize unvalidated physical-input coverage.");
+        Require(!InputMonitorSafety.IsHealthy(true, true, true, true),
+            "An unclassified HID device must keep physical-input coverage unhealthy.");
+        Require(InputMonitorSafety.IsHealthy(true, true, true, false),
+            "Validated monitor coverage with no unknown device should be healthy.");
     }
 
     private static void CheckPythonServiceLaunchConfiguration()

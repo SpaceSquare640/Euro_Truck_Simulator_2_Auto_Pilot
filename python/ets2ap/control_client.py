@@ -17,9 +17,14 @@ from typing import Callable
 from .control_protocol import (
     COMMAND_SIZE,
     MAX_PACKET_SIZE,
+    MAX_STATUS_AGE_NS,
     STATUS_MAGIC,
     STATUS_PREFIX_SIZE,
+    STATUS_V11_SIZE,
+    ControlCapabilities,
     ControlStatus,
+    REQUIRED_ENGAGE_FLAGS,
+    SafetyFlags,
     encode_command,
     parse_status,
 )
@@ -296,6 +301,7 @@ class ControlClient:
         self._sequence = 0
         self._last_command_timestamp_ns = 0
         self._last_status_timestamp_ns = 0
+        self._status_capabilities = ControlCapabilities(0)
         self._send_lock = threading.Lock()
         self._sequence_lock = threading.Lock()
         self._read_lock = threading.Lock()
@@ -307,6 +313,7 @@ class ControlClient:
         self._sequence = 0
         self._last_command_timestamp_ns = 0
         self._last_status_timestamp_ns = 0
+        self._status_capabilities = ControlCapabilities(0)
         try:
             self._pipe.connect(timeout_ms)
             if not self._pipe.verify_server():
@@ -321,24 +328,35 @@ class ControlClient:
             raise ControlClientError("control pipe connection failed") from error
 
     def send_command(self, steering: float, throttle: float, brake: float,
-                     engage: bool = False) -> int:
+                     engage: bool = False,
+                     safety_flags: SafetyFlags | int = 0) -> int:
         with self._send_lock:
             if not self._connected:
                 raise ControlClientError("control pipe is not connected")
-            if engage and not self._authorize_engage():
-                raise ControlClientError("engagement has not been explicitly authorized")
-            return self._send_locked(steering, throttle, brake, engage)
+            if engage:
+                if not self._authorize_engage():
+                    raise ControlClientError("engagement has not been explicitly authorized")
+                if not self._status_capabilities & ControlCapabilities.SAFETY_FLAGS_V11:
+                    raise ControlClientError("server does not advertise v1.1 safety-flag support")
+                if self._now_ns() - self._last_status_timestamp_ns > MAX_STATUS_AGE_NS:
+                    raise ControlClientError("server safety status is not fresh")
+                if (int(safety_flags) & REQUIRED_ENGAGE_FLAGS) != REQUIRED_ENGAGE_FLAGS:
+                    raise ControlClientError("engagement is missing required safety claims")
+                if int(safety_flags) & (1 << 5):
+                    raise ControlClientError("manual input is active")
+            return self._send_locked(steering, throttle, brake, engage, safety_flags)
 
     def _send_locked(self, steering: float, throttle: float, brake: float,
-                     engage: bool) -> int:
+                     engage: bool, safety_flags: SafetyFlags | int = 0) -> int:
         sequence = self._sequence + 1
         timestamp_ns = self._now_ns()
         if timestamp_ns <= self._last_command_timestamp_ns:
             self._close_transport()
             raise ControlClientError("monotonic clock did not advance")
         try:
-            packet = encode_command(sequence, timestamp_ns, steering, throttle, brake, engage)
-            if len(packet) != COMMAND_SIZE:
+            packet = encode_command(sequence, timestamp_ns, steering, throttle, brake,
+                                    engage, safety_flags=safety_flags)
+            if not COMMAND_SIZE <= len(packet) <= MAX_PACKET_SIZE:
                 raise ControlClientError("encoder returned an invalid command frame")
             with self._sequence_lock:
                 self._sequence = sequence
@@ -371,6 +389,8 @@ class ControlClient:
                 raise ControlClientError("status packet size is outside the supported range")
             if minor == 0 and packet_size != STATUS_PREFIX_SIZE:
                 raise ControlClientError("v1.0 status packet must be exactly 64 bytes")
+            if minor > 0 and packet_size < STATUS_V11_SIZE:
+                raise ControlClientError("v1.1 status packet is missing its capability field")
             packet = header + self._read_exact(packet_size - len(header),
                                                deadline=frame_deadline)
             status = parse_status(
@@ -383,6 +403,7 @@ class ControlClient:
             if status.last_accepted_sequence > sent_sequence:
                 raise ControlClientError("status acknowledges an unsent command")
             self._last_status_timestamp_ns = status.timestamp_ns
+            self._status_capabilities = status.capabilities
             return status
         except Exception as error:
             self._close_transport()

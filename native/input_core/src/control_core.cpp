@@ -31,7 +31,8 @@ std::uint64_t ReadLittleEndian(std::span<const std::byte> bytes,
     return value;
 }
 
-void WriteLittleEndian(std::array<std::byte, kV1PrefixSize>& bytes,
+template <std::size_t Size>
+void WriteLittleEndian(std::array<std::byte, Size>& bytes,
                        std::size_t offset, std::uint64_t value,
                        std::size_t width) noexcept {
     for (std::size_t index = 0; index < width; ++index) {
@@ -87,10 +88,11 @@ CommandResult ControlCore::AcceptCommand(std::span<const std::byte> packet,
     bool engage = false;
     std::uint64_t sequence = 0;
     std::uint64_t timestamp = 0;
+    std::uint32_t safety_flags = 0;
     bool version_mismatch = false;
     bool fatal_frame = false;
     if (!ReadCommandLocked(packet, now_ns, steering, throttle, brake, engage,
-                           sequence, timestamp, version_mismatch, fatal_frame)) {
+                           sequence, timestamp, safety_flags, version_mismatch, fatal_frame)) {
         const auto reason = version_mismatch ? ControlReason::VersionMismatch
                                              : ControlReason::MalformedPacket;
         RejectLocked(reason, fatal_frame || version_mismatch);
@@ -107,12 +109,28 @@ CommandResult ControlCore::AcceptCommand(std::span<const std::byte> packet,
         last_receive_ns_ = now_ns;
     };
 
+    SafetyGates effective_gates = gates;
+    effective_gates.explicit_ui_authorized = gates.explicit_ui_authorized &&
+        (safety_flags & UiAuthorized) != 0;
+    effective_gates.perception_ready = (safety_flags & PerceptionReady) != 0;
+    effective_gates.input_monitor_healthy = gates.input_monitor_healthy &&
+        (safety_flags & InputMonitorHealthy) != 0;
+    effective_gates.game_focused = (safety_flags & GameFocused) != 0;
+    effective_gates.front_clear = (safety_flags & FrontClear) != 0;
+    effective_gates.manual_input_active = gates.manual_input_active ||
+        (safety_flags & ManualInputActive) != 0;
+    if ((safety_flags & ManualInputActive) != 0) {
+        SetManualInputLocked(true);
+    } else if (effective_gates.input_monitor_healthy) {
+        SetManualInputLocked(gates.manual_input_active);
+    }
+
     if (manual_override_latched_) {
         accept_metadata();
         snapshot_.state = ControlState::ManualOverrideLatched;
         snapshot_.reason = ControlReason::ManualInput;
         ZeroOutputsLocked();
-        if (!manual_input_active_ && neutral) {
+        if (effective_gates.input_monitor_healthy && !manual_input_active_ && neutral) {
             manual_override_latched_ = false;
             neutral_ready_ = true;
             snapshot_.state = ControlState::Disengaged;
@@ -175,7 +193,7 @@ CommandResult ControlCore::AcceptCommand(std::span<const std::byte> packet,
         return {CommandOutcome::SafetyBlocked, false};
     }
 
-    if (!SafetyReadyLocked(gates)) {
+    if (!SafetyReadyLocked(effective_gates)) {
         accept_metadata();
         neutral_ready_ = false;
         snapshot_.state = ControlState::Disengaged;
@@ -191,7 +209,7 @@ CommandResult ControlCore::AcceptCommand(std::span<const std::byte> packet,
     if (brake > 0.0) throttle = 0.0;
     if (was_engaged) {
         ApplySlewLocked(steering, throttle, brake,
-                        gates.maximum_steering_ratio, now_ns);
+                        effective_gates.maximum_steering_ratio, now_ns);
         if (snapshot_.brake > 0.0) snapshot_.throttle = 0.0;
     } else {
         neutral_ready_ = false;
@@ -208,6 +226,10 @@ void ControlCore::Tick(std::uint64_t now_ns) noexcept {
 
 void ControlCore::SetManualInput(bool active) noexcept {
     const std::lock_guard lock(mutex_);
+    SetManualInputLocked(active);
+}
+
+void ControlCore::SetManualInputLocked(bool active) noexcept {
     if (manual_input_active_ == active) return;
     manual_input_active_ = active;
 
@@ -251,13 +273,13 @@ ControlSnapshot ControlCore::Snapshot() const noexcept {
     return snapshot_;
 }
 
-std::array<std::byte, 64> ControlCore::EncodeStatus(std::uint64_t timestamp_ns) noexcept {
+std::array<std::byte, 68> ControlCore::EncodeStatus(std::uint64_t timestamp_ns) noexcept {
     const std::lock_guard lock(mutex_);
-    std::array<std::byte, kV1PrefixSize> packet{};
+    std::array<std::byte, 68> packet{};
     WriteLittleEndian(packet, 0, kStatusMagic, 4);
     WriteLittleEndian(packet, 4, kSupportedMajor, 2);
-    WriteLittleEndian(packet, 6, 0, 2);
-    WriteLittleEndian(packet, 8, kV1PrefixSize, 4);
+    WriteLittleEndian(packet, 6, 1, 2);
+    WriteLittleEndian(packet, 8, packet.size(), 4);
     WriteLittleEndian(packet, 16, snapshot_.last_accepted_sequence, 8);
     WriteLittleEndian(packet, 24, timestamp_ns, 8);
     WriteLittleEndian(packet, 32, static_cast<std::uint32_t>(snapshot_.state), 4);
@@ -270,6 +292,7 @@ std::array<std::byte, 64> ControlCore::EncodeStatus(std::uint64_t timestamp_ns) 
     WriteLittleEndian(packet, 40, std::bit_cast<std::uint64_t>(engaged ? snapshot_.steering : 0.0), 8);
     WriteLittleEndian(packet, 48, std::bit_cast<std::uint64_t>(engaged ? snapshot_.throttle : 0.0), 8);
     WriteLittleEndian(packet, 56, std::bit_cast<std::uint64_t>(engaged ? snapshot_.brake : 0.0), 8);
+    WriteLittleEndian(packet, 64, SafetyFlagsV11, 4);
 
     if (client_disconnected_reason_pending_) {
         client_disconnected_reason_pending_ = false;
@@ -297,7 +320,8 @@ bool ControlCore::ReadCommandLocked(std::span<const std::byte> packet,
                                     std::uint64_t now_ns,
                                     double& steering, double& throttle, double& brake,
                                     bool& engage, std::uint64_t& sequence,
-                                    std::uint64_t& timestamp, bool& version_mismatch,
+                                    std::uint64_t& timestamp, std::uint32_t& safety_flags,
+                                    bool& version_mismatch,
                                     bool& fatal_frame) noexcept {
     steering = 0.0;
     throttle = 0.0;
@@ -305,6 +329,7 @@ bool ControlCore::ReadCommandLocked(std::span<const std::byte> packet,
     engage = false;
     sequence = 0;
     timestamp = 0;
+    safety_flags = 0;
     version_mismatch = false;
     fatal_frame = false;
 
@@ -326,7 +351,8 @@ bool ControlCore::ReadCommandLocked(std::span<const std::byte> packet,
         version_mismatch = true;
         return false;
     }
-    if (minor == 0 && declared_size != kV1PrefixSize) {
+    if ((minor == 0 && declared_size != kV1PrefixSize) ||
+        (minor > 0 && declared_size < kV1PrefixSize + sizeof(std::uint32_t))) {
         fatal_frame = true;
         return false;
     }
@@ -338,6 +364,10 @@ bool ControlCore::ReadCommandLocked(std::span<const std::byte> packet,
         ReadLittleEndian(packet, 57, 3) != 0 ||
         ReadLittleEndian(packet, 60, 4) != 0) {
         return false;
+    }
+    if (minor > 0) {
+        safety_flags = static_cast<std::uint32_t>(ReadLittleEndian(packet, 64, 4));
+        if ((safety_flags & ~kKnownCommandSafetyFlags) != 0) return false;
     }
 
     sequence = ReadLittleEndian(packet, 16, 8);
@@ -373,7 +403,9 @@ bool ControlCore::ReadCommandLocked(std::span<const std::byte> packet,
 
 bool ControlCore::SafetyReadyLocked(const SafetyGates& gates) const noexcept {
     return gates.telemetry_fresh && gates.speed_limit_available &&
-           gates.explicit_ui_authorized && std::isfinite(gates.maximum_steering_ratio) &&
+           gates.explicit_ui_authorized && gates.perception_ready &&
+           gates.input_monitor_healthy && gates.game_focused && gates.front_clear &&
+           !gates.manual_input_active && std::isfinite(gates.maximum_steering_ratio) &&
            gates.maximum_steering_ratio >= 0.0 && gates.maximum_steering_ratio <= 1.0;
 }
 

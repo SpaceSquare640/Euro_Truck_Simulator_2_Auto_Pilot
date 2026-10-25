@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <stop_token>
 #include <string>
 #include <thread>
@@ -14,6 +15,7 @@ namespace ets2ap::plugin {
 struct ControlPipeServerOptions {
     std::wstring trusted_client_image{};
     std::wstring pipe_name{L"\\\\.\\pipe\\ETS2AP_Control_v1"};
+    std::function<input::SafetyGates()> safety_gates{};
 };
 
 class ControlPipeServer {

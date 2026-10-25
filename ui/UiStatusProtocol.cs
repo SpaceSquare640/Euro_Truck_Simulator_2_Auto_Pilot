@@ -5,7 +5,12 @@ using System.Text.Json;
 namespace ETS2AP.Ui;
 
 internal sealed record UiStatus(string State, string? ErrorCode, long Revision,
-    double? SpeedMps, double? SpeedLimitMps, double? DistanceM, double? AgeS);
+    double? SpeedMps, double? SpeedLimitMps, double? DistanceM, double? AgeS,
+    PerceptionStatus? Perception);
+
+internal sealed record PerceptionStatus(bool FrameValid, double? FrameAgeS,
+    bool GameFocused, bool InputMonitorHealthy, bool ManualInputActive,
+    double? LaneConfidence, bool? FrontClear);
 
 internal static class UiStatusProtocol
 {
@@ -57,11 +62,26 @@ internal static class UiStatusProtocol
         long revision = payload.GetProperty("state_revision").GetInt64();
         if (revision < 0) throw new InvalidDataException("Invalid state revision.");
         JsonElement telemetry = payload.GetProperty("telemetry");
+        PerceptionStatus? perception = null;
+        if (payload.TryGetProperty("perception", out JsonElement perceptionElement))
+        {
+            bool frameValid = RequiredBoolean(perceptionElement, "frame_valid");
+            double? frameAge = OptionalNullableNonnegative(perceptionElement, "frame_age_s");
+            bool gameFocused = RequiredBoolean(perceptionElement, "game_focused");
+            bool monitorHealthy = RequiredBoolean(perceptionElement, "input_monitor_healthy");
+            bool manualInput = RequiredBoolean(perceptionElement, "manual_input_active");
+            double? confidence = OptionalNullableNonnegative(perceptionElement, "lane_confidence");
+            if (confidence is > 1.0)
+                throw new InvalidDataException("Invalid lane confidence.");
+            bool? frontClear = OptionalNullableBoolean(perceptionElement, "front_clear");
+            perception = new PerceptionStatus(frameValid, frameAge, gameFocused,
+                monitorHealthy, manualInput, confidence, frontClear);
+        }
         return new UiStatus(state, code, revision,
             OptionalNonnegative(telemetry, "speed_mps"),
             OptionalNonnegative(telemetry, "speed_limit_mps"),
             OptionalNonnegative(telemetry, "navigation_distance_m"),
-            OptionalNonnegative(telemetry, "telemetry_age_s"));
+            OptionalNonnegative(telemetry, "telemetry_age_s"), perception);
     }
 
     internal static void ValidateHelloAck(ReadOnlySpan<byte> json, string requestId)
@@ -71,8 +91,8 @@ internal static class UiStatusProtocol
         CheckObjects(document.RootElement);
         JsonElement root = document.RootElement;
         if (RequiredString(root, "type") != "hello_ack" || RequiredString(root, "id") != requestId ||
-            RequiredString(root, "version") != "1.0" ||
-            RequiredString(root.GetProperty("payload"), "selected_version") != "1.0")
+            RequiredString(root, "version") != RequiredString(root.GetProperty("payload"), "selected_version") ||
+            RequiredString(root.GetProperty("payload"), "selected_version") is not ("1.0" or "1.1"))
             throw new InvalidDataException("Invalid UI handshake.");
     }
 
@@ -83,6 +103,38 @@ internal static class UiStatusProtocol
         double number = field.GetDouble();
         if (!double.IsFinite(number) || number < 0) throw new InvalidDataException("Invalid telemetry value.");
         return number;
+    }
+
+    private static double? OptionalNullableNonnegative(JsonElement value, string name)
+    {
+        JsonElement field = value.GetProperty(name);
+        if (field.ValueKind == JsonValueKind.Null) return null;
+        double number = field.GetDouble();
+        if (!double.IsFinite(number) || number < 0) throw new InvalidDataException("Invalid perception value.");
+        return number;
+    }
+
+    private static bool RequiredBoolean(JsonElement value, string name)
+    {
+        JsonElement field = value.GetProperty(name);
+        return field.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => throw new InvalidDataException("Invalid perception flag.")
+        };
+    }
+
+    private static bool? OptionalNullableBoolean(JsonElement value, string name)
+    {
+        JsonElement field = value.GetProperty(name);
+        return field.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Null => null,
+            _ => throw new InvalidDataException("Invalid perception classification.")
+        };
     }
 
     private static string RequiredString(JsonElement value, string name)

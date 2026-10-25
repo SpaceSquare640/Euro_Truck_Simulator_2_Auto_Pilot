@@ -10,7 +10,8 @@ import unittest
 
 from ets2ap.telemetry import parse_snapshot
 from ets2ap.ui_protocol import frame, message, parse
-from ets2ap.ui_server import status_payload
+from ets2ap.perception_protocol import FrameFlags, PerceptionFrame, PIXEL_BYTES
+from ets2ap.ui_server import perception_payload, status_payload
 
 
 class UiStatusTests(unittest.TestCase):
@@ -57,6 +58,24 @@ class UiStatusTests(unittest.TestCase):
         self.assertAlmostEqual(summary.telemetry_age_s, 0.1)
         self.assertEqual(status_payload(summary, 0)["error_code"], "CONTROL_UNAVAILABLE")
         self.assertEqual(status_payload(None, 0)["error_code"], "TELEMETRY_UNAVAILABLE")
+
+    def test_perception_status_keeps_unvalidated_gates_explicit(self):
+        frame_value = PerceptionFrame(2, 1_000_000_000,
+            FrameFlags.GAME_FOCUSED | FrameFlags.FRAME_VALID, bytes(PIXEL_BYTES))
+        payload = perception_payload(frame_value, 1_040_000_000)
+        self.assertTrue(payload["frame_valid"])
+        self.assertTrue(payload["game_focused"])
+        self.assertFalse(payload["input_monitor_healthy"])
+        self.assertIsNone(payload["front_clear"])
+        self.assertLess(payload["lane_confidence"], 0.70)
+
+    def test_stale_perception_status_does_not_publish_lane_confidence(self):
+        frame_value = PerceptionFrame(2, 1_000_000_000,
+            FrameFlags.GAME_FOCUSED | FrameFlags.FRAME_VALID, bytes(PIXEL_BYTES))
+        payload = perception_payload(frame_value, 1_200_000_001)
+        self.assertFalse(payload["frame_valid"])
+        self.assertIsNone(payload["lane_confidence"])
+        self.assertIsNone(payload["front_clear"])
 
 
 if __name__ == "__main__":

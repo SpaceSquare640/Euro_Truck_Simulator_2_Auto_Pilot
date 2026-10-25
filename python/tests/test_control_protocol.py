@@ -11,6 +11,7 @@ from ets2ap.control_protocol import (
     STATUS_MAGIC,
     ControlState,
     ControlReason,
+    SafetyFlags,
     encode_command,
     parse_status,
 )
@@ -28,6 +29,7 @@ def _status_packet(
     steering: float = 0.0,
     throttle: float = 0.0,
     brake: float = 0.0,
+    capabilities: int = 1,
 ) -> bytes:
     data = bytearray(packet_size)
     struct.pack_into(
@@ -47,6 +49,8 @@ def _status_packet(
         throttle,
         brake,
     )
+    if minor > 0 and packet_size >= 68:
+        struct.pack_into("<I", data, 64, capabilities)
     return bytes(data)
 
 
@@ -58,6 +62,21 @@ class ControlProtocolTests(unittest.TestCase):
         fields = struct.unpack("<IHHIIQQdddB3sI", packet)
         self.assertEqual(fields, (COMMAND_MAGIC, 1, 0, 64, 0, 1,
                                   5_000_000_000, 0.0, 0.0, 0.0, 0, b"\0\0\0", 0))
+
+    def test_encodes_v11_safety_claims_as_an_optional_tail(self) -> None:
+        flags = (SafetyFlags.UI_AUTHORIZED | SafetyFlags.PERCEPTION_READY |
+                 SafetyFlags.INPUT_MONITOR_HEALTHY | SafetyFlags.GAME_FOCUSED |
+                 SafetyFlags.FRONT_CLEAR)
+        packet = encode_command(1, 5_000_000_000, 0.0, 0.0, 0.0, False,
+                                safety_flags=flags)
+        self.assertEqual(len(packet), 68)
+        self.assertEqual(struct.unpack_from("<HHI", packet, 4), (1, 1, 68))
+        self.assertEqual(struct.unpack_from("<I", packet, 64)[0], int(flags))
+
+    def test_rejects_unknown_safety_claims(self) -> None:
+        with self.assertRaises(ValueError):
+            encode_command(1, 5_000_000_000, 0.0, 0.0, 0.0, False,
+                           safety_flags=1 << 31)
 
     def test_rejects_invalid_or_non_neutral_disengaged_commands(self) -> None:
         invalid_commands = (
@@ -74,14 +93,14 @@ class ControlProtocolTests(unittest.TestCase):
     def test_parses_valid_status_and_compatible_minor_tail(self) -> None:
         packet = _status_packet(
             minor=3,
-            packet_size=68,
+            packet_size=72,
             last_sequence=7,
             timestamp_ns=1_000_000_000,
             state=ControlState.ENGAGED,
             steering=0.25,
             throttle=0.5,
         )
-        packet = packet[:64] + b"tail"
+        packet = packet[:68] + b"tail"
 
         status = parse_status(packet, now_ns=1_000_000_000)
 
@@ -89,6 +108,17 @@ class ControlProtocolTests(unittest.TestCase):
         self.assertEqual(status.state, ControlState.ENGAGED)
         self.assertEqual(status.steering, 0.25)
         self.assertEqual(status.throttle, 0.5)
+        self.assertEqual(int(status.capabilities), 1)
+
+    def test_v10_status_does_not_advertise_safety_flag_capability(self) -> None:
+        status = parse_status(_status_packet(minor=0, packet_size=64),
+                              now_ns=1_000_000_000)
+        self.assertEqual(int(status.capabilities), 0)
+
+    def test_rejects_unknown_status_capability_bits(self) -> None:
+        packet = _status_packet(minor=1, packet_size=68, capabilities=1 << 31)
+        with self.assertRaises(ValueError):
+            parse_status(packet, now_ns=1_000_000_000)
 
     def test_rejects_bad_header_values_and_invalid_state_output_pairs(self) -> None:
         invalid_packets = (

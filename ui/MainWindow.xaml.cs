@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ActivityItem> _activityEntries = new();
     private readonly ObservableCollection<ActivityItem> _recentActivityEntries = new();
     private UiPipeClient? _service;
+    private PerceptionCaptureService? _perceptionCapture;
     private Process? _pythonServiceProcess;
     private string? _pythonInstallRoot;
     private string? _uiExecutable;
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
         SystemParameters.StaticPropertyChanged += SystemParameters_StaticPropertyChanged;
         SystemEvents.UserPreferenceChanged += SystemEvents_UserPreferenceChanged;
         Closed += Window_Closed;
+        SourceInitialized += Window_SourceInitialized;
         StartServiceConnection();
     }
 
@@ -114,11 +116,28 @@ public partial class MainWindow : Window
     private void Window_Closed(object? sender, EventArgs e)
     {
         _isClosing = true;
+        _perceptionCapture?.Dispose();
+        _perceptionCapture = null;
         _serviceCancellation.Cancel();
         StopPythonService();
         _serviceCancellation.Dispose();
         SystemParameters.StaticPropertyChanged -= SystemParameters_StaticPropertyChanged;
         SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
+    }
+
+    private void Window_SourceInitialized(object? sender, EventArgs e)
+    {
+        try
+        {
+            _perceptionCapture = new PerceptionCaptureService(this);
+            _perceptionCapture.Start();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            InvalidOperationException or System.ComponentModel.Win32Exception or DllNotFoundException)
+        {
+            _perceptionCapture?.Dispose();
+            _perceptionCapture = null;
+        }
     }
 
     private void Browse_Click(object sender, RoutedEventArgs e)
@@ -229,7 +248,13 @@ public partial class MainWindow : Window
             $"{Strings.TelemetryAge}: {age}",
             $"{Strings.Speed}: {SpeedValue.Text} {Strings.Kmh}",
             $"{Strings.SpeedLimit}: {SpeedLimitValue.Text} {Strings.Kmh}",
-            $"{Strings.DistanceRemaining}: {DistanceValue.Text}"
+            $"{Strings.DistanceRemaining}: {DistanceValue.Text}",
+            $"{Strings.FrameCaptureLabel}: {FrameCaptureValue.Text}",
+            $"{Strings.GameFocusLabel}: {GameFocusValue.Text}",
+            $"{Strings.InputMonitoringLabel}: {InputMonitoringValue.Text}",
+            $"{Strings.ManualInputLabel}: {ManualInputValue.Text}",
+            $"{Strings.LaneConfidenceLabel}: {LaneConfidenceValue.Text}",
+            $"{Strings.FrontObstacleLabel}: {FrontObstacleValue.Text}"
         });
     }
 
@@ -358,6 +383,7 @@ public partial class MainWindow : Window
             ConnectionTitle.Text = Strings.NotConnected;
             UpdateConnectionDetail(Strings.NotConnectedDetail);
             SpeedValue.Text = SpeedLimitValue.Text = DistanceValue.Text = "--";
+            ApplyPerception(null);
             GameCheck.Text = ConnectorCheck.Text = Strings.Pending;
             ControlCheck.Text = Strings.Unavailable;
             AutomationStateValue.Text = Strings.OfflineState;
@@ -365,6 +391,7 @@ public partial class MainWindow : Window
         }
 
         ConnectionTitle.Text = Strings.ServiceConnected;
+        ApplyPerception(status.Perception);
         AutomationStateValue.Text = StateDescription(status.State);
         bool fresh = status.AgeS is <= 0.25 && status.SpeedMps is not null;
         RecordStatus(status, fresh);
@@ -390,6 +417,28 @@ public partial class MainWindow : Window
                 ? Strings.Unavailable
                 : Strings.Pending;
         ControlCheck.Text = Strings.Unavailable;
+    }
+
+    private void ApplyPerception(PerceptionStatus? status)
+    {
+        FrameCaptureValue.Text = status is null ? Strings.NotProvided
+            : status.FrameValid ? Strings.Available : Strings.Unavailable;
+        GameFocusValue.Text = status is null ? Strings.NotProvided
+            : status.GameFocused ? Strings.Available : Strings.Unavailable;
+        InputMonitoringValue.Text = status is null ? Strings.NotProvided
+            : status.InputMonitorHealthy ? Strings.Available : Strings.Unavailable;
+        ManualInputValue.Text = status is null ? Strings.NotProvided
+            : status.ManualInputActive ? Strings.StatusActive : Strings.StatusInactive;
+        LaneConfidenceValue.Text = status?.LaneConfidence is double confidence
+            ? string.Format(CultureInfo.CurrentCulture, Strings.LaneConfidenceFormat,
+                confidence * 100.0)
+            : Strings.NotProvided;
+        FrontObstacleValue.Text = status?.FrontClear switch
+        {
+            true => Strings.StatusClear,
+            false => Strings.StatusNotClear,
+            null => Strings.StatusNotValidated
+        };
     }
 
     private void RecordStatus(UiStatus? status, bool telemetryFresh)

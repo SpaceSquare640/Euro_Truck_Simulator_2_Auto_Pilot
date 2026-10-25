@@ -40,7 +40,22 @@ struct SafetyGates {
     bool speed_limit_available{};
     bool explicit_ui_authorized{};
     double maximum_steering_ratio{};
+    bool perception_ready{};
+    bool input_monitor_healthy{};
+    bool game_focused{};
+    bool front_clear{};
+    bool manual_input_active{};
 };
+
+enum CommandSafetyFlag : std::uint32_t {
+    UiAuthorized = 1U << 0,
+    PerceptionReady = 1U << 1,
+    InputMonitorHealthy = 1U << 2,
+    GameFocused = 1U << 3,
+    FrontClear = 1U << 4,
+    ManualInputActive = 1U << 5,
+};
+inline constexpr std::uint32_t kKnownCommandSafetyFlags = 0x3FU;
 
 struct ControlSnapshot {
     std::uint64_t last_accepted_sequence{};
@@ -50,6 +65,11 @@ struct ControlSnapshot {
     double throttle{};
     double brake{};
 };
+
+enum ControlCapability : std::uint32_t {
+    SafetyFlagsV11 = 1U << 0,
+};
+inline constexpr std::uint32_t kKnownControlCapabilities = 0x1U;
 
 struct CommandResult {
     CommandOutcome outcome{CommandOutcome::Rejected};
@@ -66,7 +86,7 @@ public:
     void SetManualInput(bool active) noexcept;
     void Disconnect() noexcept;
     ControlSnapshot Snapshot() const noexcept;
-    std::array<std::byte, 64> EncodeStatus(std::uint64_t timestamp_ns) noexcept;
+    std::array<std::byte, 68> EncodeStatus(std::uint64_t timestamp_ns) noexcept;
 
 private:
     void RejectLocked(ControlReason reason, bool close_connection) noexcept;
@@ -74,9 +94,11 @@ private:
                            std::uint64_t now_ns,
                            double& steering, double& throttle, double& brake,
                            bool& engage, std::uint64_t& sequence,
-                           std::uint64_t& timestamp, bool& version_mismatch,
+                           std::uint64_t& timestamp, std::uint32_t& safety_flags,
+                           bool& version_mismatch,
                            bool& fatal_frame) noexcept;
     bool SafetyReadyLocked(const SafetyGates& gates) const noexcept;
+    void SetManualInputLocked(bool active) noexcept;
     void ExpireIfNeededLocked(std::uint64_t now_ns) noexcept;
     void ZeroOutputsLocked() noexcept;
     void ApplySlewLocked(double steering, double throttle, double brake,

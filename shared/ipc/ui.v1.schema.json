@@ -249,6 +249,52 @@
       },
       "additionalProperties": true
     },
+    "perceptionSummary": {
+      "type": "object",
+      "required": [
+        "frame_valid",
+        "frame_age_s",
+        "game_focused",
+        "input_monitor_healthy",
+        "manual_input_active",
+        "lane_confidence",
+        "front_clear"
+      ],
+      "properties": {
+        "frame_valid": {
+          "type": "boolean"
+        },
+        "frame_age_s": {
+          "$ref": "#/$defs/nullableNonnegative"
+        },
+        "game_focused": {
+          "type": "boolean"
+        },
+        "input_monitor_healthy": {
+          "type": "boolean",
+          "description": "False until physical-input coverage is validated independently of API registration."
+        },
+        "manual_input_active": {
+          "type": "boolean"
+        },
+        "lane_confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "front_clear": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Null means the front-obstacle detector is not validated."
+        }
+      },
+      "additionalProperties": true
+    },
     "config": {
       "type": "object",
       "required": [
@@ -446,6 +492,9 @@
                 },
                 "telemetry": {
                   "$ref": "#/$defs/telemetrySummary"
+                },
+                "perception": {
+                  "$ref": "#/$defs/perceptionSummary"
                 },
                 "state_revision": {
                   "type": "integer",

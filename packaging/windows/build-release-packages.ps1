@@ -154,7 +154,9 @@ $pythonModulesRoot = Join-Path $pythonServiceRoot 'ets2ap'
 [void](New-Item -ItemType Directory -Path $pythonModulesRoot -Force)
 $expectedPythonModuleFiles = @(
     '__init__.py', 'control_client.py', 'control_protocol.py',
-    'telemetry.py', 'ui_protocol.py', 'ui_server.py'
+    'driver_control.py', 'driver_runtime.py', 'lane_perception.py',
+    'perception.py', 'perception_protocol.py', 'telemetry.py',
+    'ui_protocol.py', 'ui_server.py'
 )
 foreach ($moduleFile in $expectedPythonModuleFiles) {
     $moduleSource = Join-Path $pythonPackageSource $moduleFile
@@ -177,7 +179,7 @@ $runtimeVersionOutput = & (Join-Path $pythonRuntimeRoot 'python.exe') -I -S -c '
 if ($LASTEXITCODE -ne 0 -or [string]::Join('', $runtimeVersionOutput).Trim() -ne $pythonVersion) {
     throw 'Bundled CPython runtime did not report its pinned version.'
 }
-$moduleImportOutput = & (Join-Path $pythonRuntimeRoot 'python.exe') -I -S -c 'import ets2ap.control_client, ets2ap.ui_server; print("service modules import successfully")'
+$moduleImportOutput = & (Join-Path $pythonRuntimeRoot 'python.exe') -I -S -c 'import ets2ap.control_client, ets2ap.driver_runtime, ets2ap.perception, ets2ap.ui_server; print("service modules import successfully")'
 if ($LASTEXITCODE -ne 0 -or [string]::Join('', $moduleImportOutput).Trim() -ne 'service modules import successfully') {
     throw 'Bundled CPython runtime could not import the packaged UI service modules.'
 }

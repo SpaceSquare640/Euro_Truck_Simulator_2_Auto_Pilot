@@ -5,16 +5,19 @@ from __future__ import annotations
 import math
 import struct
 from dataclasses import dataclass
-from enum import IntEnum
+from enum import IntFlag, IntEnum
 
 COMMAND_MAGIC = 0x50413243
 STATUS_MAGIC = 0x50413253
 CONTROL_MAJOR = 1
 COMMAND_SIZE = 64
+COMMAND_V11_SIZE = 68
 STATUS_PREFIX_SIZE = 64
+STATUS_V11_SIZE = 68
 MAX_PACKET_SIZE = 256
 MAX_STATUS_AGE_NS = 250_000_000
 _COMMAND = struct.Struct("<IHHIIQQdddB3sI")
+_COMMAND_SAFETY_FLAGS = struct.Struct("<I")
 _STATUS = struct.Struct("<IHHIIQQII3d")
 _UINT64_MAX = (1 << 64) - 1
 
@@ -37,6 +40,34 @@ class ControlReason(IntEnum):
     TELEMETRY_UNAVAILABLE = 6
 
 
+class SafetyFlags(IntFlag):
+    UI_AUTHORIZED = 1 << 0
+    PERCEPTION_READY = 1 << 1
+    INPUT_MONITOR_HEALTHY = 1 << 2
+    GAME_FOCUSED = 1 << 3
+    FRONT_CLEAR = 1 << 4
+    MANUAL_INPUT_ACTIVE = 1 << 5
+
+
+KNOWN_SAFETY_FLAGS = int(
+    SafetyFlags.UI_AUTHORIZED | SafetyFlags.PERCEPTION_READY |
+    SafetyFlags.INPUT_MONITOR_HEALTHY | SafetyFlags.GAME_FOCUSED |
+    SafetyFlags.FRONT_CLEAR | SafetyFlags.MANUAL_INPUT_ACTIVE
+)
+
+
+class ControlCapabilities(IntFlag):
+    SAFETY_FLAGS_V11 = 1 << 0
+
+
+KNOWN_CONTROL_CAPABILITIES = int(ControlCapabilities.SAFETY_FLAGS_V11)
+REQUIRED_ENGAGE_FLAGS = int(
+    SafetyFlags.UI_AUTHORIZED | SafetyFlags.PERCEPTION_READY |
+    SafetyFlags.INPUT_MONITOR_HEALTHY | SafetyFlags.GAME_FOCUSED |
+    SafetyFlags.FRONT_CLEAR
+)
+
+
 @dataclass(frozen=True)
 class ControlStatus:
     last_accepted_sequence: int
@@ -46,10 +77,12 @@ class ControlStatus:
     steering: float
     throttle: float
     brake: float
+    capabilities: ControlCapabilities = ControlCapabilities(0)
 
 
 def encode_command(sequence: int, timestamp_ns: int, steering: float,
-                   throttle: float, brake: float, engage: bool) -> bytes:
+                   throttle: float, brake: float, engage: bool,
+                   safety_flags: SafetyFlags | int = 0) -> bytes:
     if isinstance(sequence, bool) or not isinstance(sequence, int):
         raise ValueError("sequence must be an integer")
     if sequence < 1 or sequence >= _UINT64_MAX:
@@ -60,6 +93,10 @@ def encode_command(sequence: int, timestamp_ns: int, steering: float,
         raise ValueError("timestamp_ns is outside the uint64 range")
     if type(engage) is not bool:
         raise ValueError("engage must be a bool")
+    if isinstance(safety_flags, bool) or not isinstance(safety_flags, int):
+        raise ValueError("safety_flags must be an integer bitmask")
+    if safety_flags < 0 or safety_flags & ~KNOWN_SAFETY_FLAGS:
+        raise ValueError("safety_flags contains unknown bits")
 
     values = (steering, throttle, brake)
     limits = ((-1.0, 1.0), (0.0, 1.0), (0.0, 1.0))
@@ -74,10 +111,10 @@ def encode_command(sequence: int, timestamp_ns: int, steering: float,
     if not engage and any(normalized):
         raise ValueError("disengaged commands must be neutral")
 
-    return _COMMAND.pack(
+    packet = bytearray(_COMMAND.pack(
         COMMAND_MAGIC,
         CONTROL_MAJOR,
-        0,
+        1 if safety_flags else 0,
         COMMAND_SIZE,
         0,
         sequence,
@@ -86,7 +123,11 @@ def encode_command(sequence: int, timestamp_ns: int, steering: float,
         int(engage),
         b"\0\0\0",
         0,
-    )
+    ))
+    if safety_flags:
+        struct.pack_into("<I", packet, 8, COMMAND_V11_SIZE)
+        packet.extend(_COMMAND_SAFETY_FLAGS.pack(safety_flags))
+    return bytes(packet)
 
 
 def parse_status(packet: bytes, *, now_ns: int,
@@ -110,8 +151,14 @@ def parse_status(packet: bytes, *, now_ns: int,
         raise ValueError("status packet_size does not match the frame")
     if minor == 0 and packet_size != STATUS_PREFIX_SIZE:
         raise ValueError("v1.0 status packets must use the fixed prefix size")
+    if minor > 0 and packet_size < STATUS_V11_SIZE:
+        raise ValueError("v1.1 status packet is missing its capability field")
     if reserved != 0:
         raise ValueError("status reserved header must be zero")
+    raw_capabilities = (struct.unpack_from("<I", packet, STATUS_PREFIX_SIZE)[0]
+                        if minor > 0 else 0)
+    if raw_capabilities & ~KNOWN_CONTROL_CAPABILITIES:
+        raise ValueError("status contains unknown capabilities")
 
     try:
         state = ControlState(state_value)
@@ -161,4 +208,5 @@ def parse_status(packet: bytes, *, now_ns: int,
         0.0 if steering == 0.0 else steering,
         0.0 if throttle == 0.0 else throttle,
         0.0 if brake == 0.0 else brake,
+        ControlCapabilities(raw_capabilities),
     )

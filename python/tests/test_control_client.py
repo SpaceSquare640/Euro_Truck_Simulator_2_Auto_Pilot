@@ -8,7 +8,9 @@ import time
 import unittest
 
 from ets2ap.control_client import ControlClient, ControlClientError
-from ets2ap.control_protocol import COMMAND_MAGIC, STATUS_MAGIC, ControlReason, ControlState
+from ets2ap.control_protocol import (
+    COMMAND_MAGIC, STATUS_MAGIC, ControlReason, ControlState, SafetyFlags,
+)
 
 
 class _FakePipe:
@@ -70,11 +72,16 @@ class _AckRacePipe(_FakePipe):
 
 
 def _status_packet(timestamp_ns: int = 1_000_000_000,
-                   last_accepted_sequence: int = 1) -> bytes:
-    return struct.pack("<IHHIIQQII3d", STATUS_MAGIC, 1, 0, 64, 0,
-                       last_accepted_sequence,
-                       timestamp_ns, ControlState.DISENGAGED, ControlReason.NONE,
-                       0.0, 0.0, 0.0)
+                   last_accepted_sequence: int = 1,
+                   *, minor: int = 1, capabilities: int = 1) -> bytes:
+    packet_size = 68 if minor > 0 else 64
+    packet = bytearray(struct.pack("<IHHIIQQII3d", STATUS_MAGIC, 1, minor,
+                                   packet_size, 0, last_accepted_sequence,
+                                   timestamp_ns, ControlState.DISENGAGED,
+                                   ControlReason.NONE, 0.0, 0.0, 0.0))
+    if minor > 0:
+        packet.extend(struct.pack("<I", capabilities))
+    return bytes(packet)
 
 
 class ControlClientTests(unittest.TestCase):
@@ -105,7 +112,7 @@ class ControlClientTests(unittest.TestCase):
 
     def test_commands_require_connection_and_sequence_increments(self) -> None:
         pipe = _FakePipe()
-        timestamps = iter((1_000_000_000, 1_050_000_000))
+        timestamps = iter((1_000_000_000, 1_050_000_000, 1_100_000_000, 1_150_000_000))
         client = ControlClient("trusted-server.exe", pipe=pipe,
                                authorize_engage=lambda: True,
                                now_ns=lambda: next(timestamps))
@@ -113,11 +120,35 @@ class ControlClientTests(unittest.TestCase):
             client.send_command(0.0, 0.0, 0.0, False)
 
         client.connect()
-        client.send_command(0.25, 0.0, 0.0, True)
+        pipe.read_buffer.extend(_status_packet())
+        client.read_status()
+        flags = (SafetyFlags.UI_AUTHORIZED | SafetyFlags.PERCEPTION_READY |
+                 SafetyFlags.INPUT_MONITOR_HEALTHY | SafetyFlags.GAME_FOCUSED |
+                 SafetyFlags.FRONT_CLEAR)
+        client.send_command(0.25, 0.0, 0.0, True, safety_flags=flags)
         self.assertEqual(len(pipe.writes), 2)
-        fields = struct.unpack("<IHHIIQQdddB3sI", pipe.writes[1])
+        fields = struct.unpack_from("<IHHIIQQdddB3sI", pipe.writes[1])
         self.assertEqual(fields[5], 2)
         self.assertEqual(fields[7:11], (0.25, 0.0, 0.0, 1))
+
+    def test_forwards_safety_flags_in_control_v11_extension(self) -> None:
+        pipe = _FakePipe()
+        timestamps = iter((1_000_000_000, 1_050_000_000, 1_100_000_000, 1_150_000_000))
+        client = ControlClient("trusted-server.exe", pipe=pipe,
+                               authorize_engage=lambda: True,
+                               now_ns=lambda: next(timestamps))
+        client.connect()
+        pipe.read_buffer.extend(_status_packet())
+        client.read_status()
+        flags = (SafetyFlags.UI_AUTHORIZED | SafetyFlags.PERCEPTION_READY |
+                 SafetyFlags.INPUT_MONITOR_HEALTHY | SafetyFlags.GAME_FOCUSED |
+                 SafetyFlags.FRONT_CLEAR)
+
+        client.send_command(0.25, 0.0, 0.0, True, safety_flags=flags)
+
+        packet = pipe.writes[-1]
+        self.assertEqual(struct.unpack_from("<HHI", packet, 4), (1, 1, 68))
+        self.assertEqual(struct.unpack_from("<I", packet, 64)[0], int(flags))
 
     def test_reconnect_starts_a_fresh_sequence_domain(self) -> None:
         pipe = _FakePipe()
@@ -150,7 +181,7 @@ class ControlClientTests(unittest.TestCase):
         reader.start()
         self.assertTrue(pipe.read_started.wait(0.5))
 
-        self.assertEqual(client.send_command(0.25, 0.0, 0.0, True), 2)
+        self.assertEqual(client.send_command(0.0, 0.0, 0.0, False), 2)
         pipe.release_read.set()
         reader.join(0.5)
 
@@ -159,11 +190,17 @@ class ControlClientTests(unittest.TestCase):
 
     def test_ack_for_command_being_written_is_not_rejected_as_unsent(self) -> None:
         pipe = _AckRacePipe()
-        timestamps = iter((1_000_000_000, 1_001_000_000, 1_002_000_000))
+        from itertools import count
+
+        timestamps = count(1_000_000_000, 1_000_000)
         client = ControlClient("trusted-server.exe", pipe=pipe,
                                authorize_engage=lambda: True,
                                now_ns=lambda: next(timestamps))
         client.connect()
+        pipe.block_first_read = False
+        pipe.read_buffer.extend(_status_packet(timestamp_ns=1_001_000_000))
+        client.read_status()
+        pipe.block_first_read = True
         status_results = []
         status_errors = []
 
@@ -178,7 +215,7 @@ class ControlClientTests(unittest.TestCase):
         reader = threading.Thread(target=read_status)
         reader.start()
         self.assertTrue(pipe.read_started.wait(0.5))
-        writer = threading.Thread(target=lambda: client.send_command(0.25, 0.0, 0.0, True))
+        writer = threading.Thread(target=lambda: client.send_command(0.0, 0.0, 0.0, False))
         writer.start()
         writer.join(1.0)
         reader.join(1.0)
@@ -198,6 +235,22 @@ class ControlClientTests(unittest.TestCase):
             client.send_command(0.0, 0.0, 0.0, True)
 
         self.assertEqual(len(pipe.writes), 1)
+
+    def test_v10_server_status_cannot_authorize_v11_engagement(self) -> None:
+        pipe = _FakePipe()
+        timestamps = iter((1_000_000_000, 1_050_000_000, 1_100_000_000))
+        client = ControlClient("trusted-server.exe", pipe=pipe,
+                               authorize_engage=lambda: True,
+                               now_ns=lambda: next(timestamps))
+        client.connect()
+        pipe.read_buffer.extend(_status_packet(minor=0, capabilities=0))
+        status = client.read_status()
+        self.assertEqual(int(status.capabilities), 0)
+        flags = (SafetyFlags.UI_AUTHORIZED | SafetyFlags.PERCEPTION_READY |
+                 SafetyFlags.INPUT_MONITOR_HEALTHY | SafetyFlags.GAME_FOCUSED |
+                 SafetyFlags.FRONT_CLEAR)
+        with self.assertRaises(ControlClientError):
+            client.send_command(0.0, 0.0, 0.0, True, safety_flags=flags)
 
     def test_reads_and_validates_status_frame(self) -> None:
         pipe = _FakePipe()

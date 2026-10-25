@@ -154,7 +154,7 @@ input::ControlSnapshot ControlHost::Snapshot() noexcept {
     }
 }
 
-std::optional<std::array<std::byte, 64>> ControlHost::EncodeStatus() noexcept {
+std::optional<std::array<std::byte, 68>> ControlHost::EncodeStatus() noexcept {
     try {
         const std::lock_guard lock(operation_mutex_);
         const auto now_ns = ReadNowNsLocked();

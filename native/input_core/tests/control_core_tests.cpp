@@ -16,6 +16,7 @@ namespace {
 constexpr std::uint32_t kCommandMagic = 0x50413243U;
 constexpr std::uint32_t kStatusMagic = 0x50413253U;
 constexpr std::uint64_t kStartNs = 1'000'000'000ULL;
+constexpr std::uint32_t kRequiredSafetyFlags = 0x1FU;
 
 void PutLittleEndian(std::vector<std::byte>& bytes, std::size_t offset,
                      std::uint64_t value, std::size_t width) {
@@ -38,7 +39,10 @@ void PutDouble(std::vector<std::byte>& bytes, std::size_t offset, double value) 
 std::vector<std::byte> Packet(std::uint64_t sequence, std::uint64_t timestamp_ns,
                               double steering = 0.0, double throttle = 0.0,
                               double brake = 0.0, bool engage = false,
-                              std::uint16_t minor = 0, std::size_t size = 64) {
+                              std::uint16_t minor = 0, std::size_t size = 64,
+                              std::uint32_t safety_flags = 0xFFFFFFFFU) {
+    if (safety_flags == 0xFFFFFFFFU) safety_flags = engage ? kRequiredSafetyFlags : 0U;
+    if (safety_flags != 0U) { minor = 1; size = 68; }
     std::vector<std::byte> bytes(size);
     PutLittleEndian(bytes, 0, kCommandMagic, 4);
     PutLittleEndian(bytes, 4, 1, 2);
@@ -50,11 +54,12 @@ std::vector<std::byte> Packet(std::uint64_t sequence, std::uint64_t timestamp_ns
     PutDouble(bytes, 40, throttle);
     PutDouble(bytes, 48, brake);
     PutLittleEndian(bytes, 56, engage ? 1 : 0, 1);
+    if (size >= 68) PutLittleEndian(bytes, 64, safety_flags, 4);
     return bytes;
 }
 
 SafetyGates SafeGates(double steering_limit = 1.0) {
-    return {true, true, true, steering_limit};
+    return {true, true, true, steering_limit, true, true, true, true, false};
 }
 
 CommandResult Accept(ControlCore& core, const std::vector<std::byte>& packet,
@@ -158,6 +163,48 @@ ETS2AP_TEST(EngagementNeedsFreshNeutralAndAllSafetyGates) {
     CHECK_EQ(status.state, ControlState::Engaged);
     CHECK_EQ(status.steering, 0.0);
     CHECK_EQ(status.throttle, 0.0);
+}
+
+ETS2AP_TEST(V11EngagementRequiresEveryIndependentSafetyClaim) {
+    for (std::uint32_t missing = 1; missing <= 0x10; missing <<= 1) {
+        ControlCore core;
+        core.Connect(kStartNs);
+        CHECK_EQ(Accept(core, Packet(1, kStartNs), kStartNs).outcome,
+                 CommandOutcome::Accepted);
+        CHECK_EQ(Accept(core, Packet(2, kStartNs + 1, 0, 0, 0, false),
+                        kStartNs + 1).outcome, CommandOutcome::Accepted);
+        const auto incomplete = Packet(3, kStartNs + 2, 0.1, 0.1, 0, true,
+                                       1, 68, kRequiredSafetyFlags & ~missing);
+        CHECK_EQ(Accept(core, incomplete, kStartNs + 2, SafeGates()).outcome,
+                 CommandOutcome::SafetyBlocked);
+        CHECK_EQ(core.Snapshot().throttle, 0.0);
+    }
+}
+
+ETS2AP_TEST(V11ManualInputClaimImmediatelyLatchesNeutralOverride) {
+    ControlCore core;
+    core.Connect(kStartNs);
+    CHECK_EQ(Accept(core, Packet(1, kStartNs), kStartNs).outcome,
+             CommandOutcome::Accepted);
+    CHECK_EQ(Accept(core, Packet(2, kStartNs + 1, 0.1, 0.1, 0, true),
+                    kStartNs + 1, SafeGates()).outcome, CommandOutcome::Accepted);
+
+    const auto manual = Packet(3, kStartNs + 2, 0, 0, 0, false, 1, 68,
+                               kRequiredSafetyFlags | 0x20U);
+    CHECK_EQ(Accept(core, manual, kStartNs + 2, SafeGates()).outcome,
+             CommandOutcome::ManualOverride);
+    const auto status = core.Snapshot();
+    CHECK_EQ(status.state, ControlState::ManualOverrideLatched);
+    CHECK_EQ(status.steering, 0.0);
+    CHECK_EQ(status.throttle, 0.0);
+    CHECK_EQ(status.brake, 0.0);
+}
+
+ETS2AP_TEST(V11UnknownSafetyFlagsAreRejected) {
+    ControlCore core;
+    core.Connect(kStartNs);
+    const auto packet = Packet(1, kStartNs, 0, 0, 0, false, 1, 68, 0x80000000U);
+    CHECK_EQ(Accept(core, packet, kStartNs).outcome, CommandOutcome::Rejected);
 }
 
 ETS2AP_TEST(BrakePriorityAndIndependentSlewLimitsApply) {
@@ -286,8 +333,9 @@ ETS2AP_TEST(ManualOverrideLatchRequiresReleaseAndNeutralCommand) {
     CHECK_EQ(core.Snapshot().throttle, 0.0);
     core.SetManualInput(false);
     CHECK_EQ(core.Snapshot().state, ControlState::ManualOverrideLatched);
-    CHECK_EQ(Accept(core, Packet(3, kStartNs + 2), kStartNs + 2).outcome,
-             CommandOutcome::Accepted);
+    CHECK_EQ(Accept(core, Packet(3, kStartNs + 2, 0, 0, 0, false, 1, 68,
+                                 InputMonitorHealthy),
+                    kStartNs + 2, SafeGates()).outcome, CommandOutcome::Accepted);
     CHECK_EQ(core.Snapshot().state, ControlState::Disengaged);
     CHECK_EQ(Accept(core, Packet(4, kStartNs + 3, 0, 0.2, 0, true), kStartNs + 3,
                     SafeGates()).outcome, CommandOutcome::Accepted);
@@ -300,16 +348,43 @@ ETS2AP_TEST(StatusPacketUsesDefinedLittleEndianLayout) {
     core.Connect(kStartNs);
     CHECK_EQ(Accept(core, Packet(1, kStartNs), kStartNs).outcome, CommandOutcome::Accepted);
     const auto packet = core.EncodeStatus(kStartNs + 25);
-    CHECK_EQ(packet.size(), std::size_t{64});
+    CHECK_EQ(packet.size(), std::size_t{68});
     CHECK_EQ(GetLittleEndian(packet, 0, 4), static_cast<std::uint64_t>(kStatusMagic));
     CHECK_EQ(GetLittleEndian(packet, 4, 2), 1ULL);
-    CHECK_EQ(GetLittleEndian(packet, 6, 2), 0ULL);
-    CHECK_EQ(GetLittleEndian(packet, 8, 4), 64ULL);
+    CHECK_EQ(GetLittleEndian(packet, 6, 2), 1ULL);
+    CHECK_EQ(GetLittleEndian(packet, 8, 4), 68ULL);
     CHECK_EQ(GetLittleEndian(packet, 16, 8), 1ULL);
     CHECK_EQ(GetLittleEndian(packet, 24, 8), kStartNs + 25);
     CHECK_EQ(GetLittleEndian(packet, 32, 4), static_cast<std::uint64_t>(ControlState::Disengaged));
     CHECK_EQ(GetLittleEndian(packet, 36, 4), static_cast<std::uint64_t>(ControlReason::None));
     CHECK_EQ(std::bit_cast<double>(GetLittleEndian(packet, 40, 8)), 0.0);
+    CHECK_EQ(GetLittleEndian(packet, 64, 4), static_cast<std::uint64_t>(SafetyFlagsV11));
+}
+
+ETS2AP_TEST(EngagementRequiresLocalInputMonitorAsWellAsWireClaim) {
+    ControlCore core;
+    core.Connect(kStartNs);
+    CHECK_EQ(Accept(core, Packet(1, kStartNs), kStartNs).outcome,
+             CommandOutcome::Accepted);
+    auto gates = SafeGates();
+    gates.input_monitor_healthy = false;
+    CHECK_EQ(Accept(core, Packet(2, kStartNs + 1, 0, 0.1, 0, true),
+                    kStartNs + 1, gates).outcome, CommandOutcome::SafetyBlocked);
+    CHECK_EQ(core.Snapshot().state, ControlState::Disengaged);
+    CHECK_EQ(core.Snapshot().throttle, 0.0);
+}
+
+ETS2AP_TEST(EngagementRequiresIndependentLocalUiAuthorization) {
+    ControlCore core;
+    core.Connect(kStartNs);
+    CHECK_EQ(Accept(core, Packet(1, kStartNs), kStartNs).outcome,
+             CommandOutcome::Accepted);
+    auto gates = SafeGates();
+    gates.explicit_ui_authorized = false;
+    CHECK_EQ(Accept(core, Packet(2, kStartNs + 1, 0, 0.1, 0, true),
+                    kStartNs + 1, gates).outcome, CommandOutcome::SafetyBlocked);
+    CHECK_EQ(core.Snapshot().state, ControlState::Disengaged);
+    CHECK_EQ(core.Snapshot().throttle, 0.0);
 }
 
 ETS2AP_TEST(DisconnectZerosAndPreservesManualLatch) {
@@ -335,8 +410,9 @@ ETS2AP_TEST(DisconnectZerosAndPreservesManualLatch) {
     CHECK_EQ(Accept(core, Packet(1, kStartNs + 2), kStartNs + 2).outcome,
              CommandOutcome::ManualOverride);
     core.SetManualInput(false);
-    CHECK_EQ(Accept(core, Packet(2, kStartNs + 4), kStartNs + 4).outcome,
-             CommandOutcome::Accepted);
+    CHECK_EQ(Accept(core, Packet(2, kStartNs + 4, 0, 0, 0, false, 1, 68,
+                                 InputMonitorHealthy),
+                    kStartNs + 4, SafeGates()).outcome, CommandOutcome::Accepted);
     CHECK_EQ(core.Snapshot().state, ControlState::Disengaged);
     CHECK_EQ(Accept(core, Packet(3, kStartNs + 5, 0, 0.1, 0, true), kStartNs + 5,
                     SafeGates()).outcome, CommandOutcome::Accepted);

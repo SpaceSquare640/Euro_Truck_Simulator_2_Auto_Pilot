@@ -1,5 +1,7 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 #include "ets2ap/plugin/control_pipe_server.h"
+#include "ets2ap/plugin/input_plugin.h"
+#include "ets2ap/plugin/telemetry_plugin.h"
 
 #include <Windows.h>
 #include <sddl.h>
@@ -411,7 +413,13 @@ bool ControlPipeServer::ServeClient(void* raw_pipe, std::stop_token stop_token) 
             ReadExact(pipe, std::span<std::byte>(packet).subspan(header.size()),
                       frame_deadline, stop_token) != IoResult::Complete) return false;
 
-        const auto result = host_.AcceptCommand(packet);
+        input::SafetyGates gates{};
+        try {
+            if (options_.safety_gates) gates = options_.safety_gates();
+        } catch (...) {
+            gates = {};
+        }
+        const auto result = host_.AcceptCommand(packet, gates);
         if (result.close_connection) break;
     }
     status_writer.request_stop();
@@ -436,8 +444,23 @@ std::wstring TrustedControlClientImageFromInstallRegistry() {
 }
 
 ControlPipeServer& GlobalControlPipeServer() noexcept {
-    static ControlPipeServer server{GlobalControlHost(),
-        ControlPipeServerOptions{TrustedControlClientImageFromInstallRegistry()}};
+    static ControlPipeServer server{GlobalControlHost(), [] {
+        ControlPipeServerOptions options{};
+        options.trusted_client_image = TrustedControlClientImageFromInstallRegistry();
+        options.safety_gates = [] {
+            input::SafetyGates gates{};
+            const auto now = GlobalInputPlugin().NowNs();
+            if (!now) return gates;
+            const auto telemetry = GlobalTelemetryPlugin().ControlSnapshot(*now);
+            gates.telemetry_fresh = telemetry.fresh;
+            gates.speed_limit_available = telemetry.speed_limit_available;
+            // The WPF authorization path is not connected to native/input yet.
+            gates.explicit_ui_authorized = false;
+            gates.maximum_steering_ratio = 0.30;
+            return gates;
+        };
+        return options;
+    }()};
     return server;
 }
 

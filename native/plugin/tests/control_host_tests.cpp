@@ -41,23 +41,26 @@ void PutDouble(std::vector<std::byte>& bytes, std::size_t offset, double value) 
 
 std::vector<std::byte> Packet(std::uint64_t sequence, std::uint64_t timestamp_ns,
                               double steering = 0.0, double throttle = 0.0,
-                              double brake = 0.0, bool engage = false) {
-    std::vector<std::byte> bytes(64);
+                              double brake = 0.0, bool engage = false,
+                              std::uint32_t safety_flags = 0) {
+    if (engage && safety_flags == 0) safety_flags = 0x1FU;
+    std::vector<std::byte> bytes((engage || safety_flags != 0) ? 68 : 64);
     PutLittleEndian(bytes, 0, kCommandMagic, 4);
     PutLittleEndian(bytes, 4, 1, 2);
-    PutLittleEndian(bytes, 6, 0, 2);
-    PutLittleEndian(bytes, 8, 64, 4);
+    PutLittleEndian(bytes, 6, bytes.size() > 64 ? 1 : 0, 2);
+    PutLittleEndian(bytes, 8, bytes.size(), 4);
     PutLittleEndian(bytes, 16, sequence, 8);
     PutLittleEndian(bytes, 24, timestamp_ns, 8);
     PutDouble(bytes, 32, steering);
     PutDouble(bytes, 40, throttle);
     PutDouble(bytes, 48, brake);
     PutLittleEndian(bytes, 56, engage ? 1 : 0, 1);
+    if (bytes.size() > 64) PutLittleEndian(bytes, 64, safety_flags, 4);
     return bytes;
 }
 
 SafetyGates SafeGates() {
-    return {true, true, true, 1.0};
+    return {true, true, true, 1.0, true, true, true, true, false};
 }
 
 struct CapturedOutput {
@@ -224,7 +227,8 @@ ETS2AP_TEST(ControlHostManualOverridePublishesNeutralImmediately) {
     }));
     host.SetManualInput(false);
     now_ns.store(kStartNs + 20'000'003ULL, std::memory_order_release);
-    CHECK_EQ(host.AcceptCommand(Packet(4, kStartNs + 20'000'003ULL),
+    CHECK_EQ(host.AcceptCommand(Packet(4, kStartNs + 20'000'003ULL, 0, 0, 0,
+                                       false, InputMonitorHealthy),
                                 SafeGates()).outcome, CommandOutcome::Accepted);
     CHECK(WaitForSnapshot(output, [](const ControlSnapshot& snapshot) {
         return snapshot.state == ControlState::Disengaged && snapshot.throttle == 0.0;

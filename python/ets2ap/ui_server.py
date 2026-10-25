@@ -15,6 +15,9 @@ import time
 from ctypes import wintypes
 
 from .telemetry import TelemetryReader, TelemetrySummary
+from .lane_perception import detect_lane
+from .perception_protocol import MAX_FRAME_AGE_NS, PerceptionFrame
+from .perception import PerceptionReader
 from .ui_protocol import MAX_FRAME, frame, message, parse
 
 PIPE_NAME = r"\\.\pipe\ETS2AP_UI_v1"
@@ -260,23 +263,47 @@ class WinPipe:
         self.kernel.CloseHandle(self.handle)
 
 
-def status_payload(summary: TelemetrySummary | None, revision: int) -> dict:
+def perception_payload(frame: PerceptionFrame | None, now_ns: int) -> dict:
+    age_ns = None if frame is None or frame.timestamp_ns > now_ns else now_ns - frame.timestamp_ns
+    age_s = age_ns / 1_000_000_000 if age_ns is not None else None
+    fresh = age_ns is not None and age_ns <= MAX_FRAME_AGE_NS
+    valid = bool(frame and frame.frame_valid and fresh)
+    lane_confidence = None
+    if valid and frame is not None:
+        lane_confidence = detect_lane(frame.rgb, width=160, height=90).confidence
+    return {
+        "frame_valid": valid,
+        "frame_age_s": age_s,
+        "game_focused": bool(frame and frame.game_focused),
+        "input_monitor_healthy": bool(frame and frame.input_monitor_healthy),
+        "manual_input_active": bool(frame and frame.manual_input_active),
+        "lane_confidence": lane_confidence,
+        "front_clear": None,
+    }
+
+
+def status_payload(summary: TelemetrySummary | None, revision: int,
+                   perception: dict | None = None) -> dict:
     if summary is None or summary.speed_mps is None or summary.paused is None:
         error = "TELEMETRY_UNAVAILABLE"
     elif summary.telemetry_age_s is None or summary.telemetry_age_s > 0.25:
         error = "TELEMETRY_STALE"
     else:
         error = "CONTROL_UNAVAILABLE"
-    return {"state": "fault", "error_code": error, "state_revision": revision,
+    payload = {"state": "fault", "error_code": error, "state_revision": revision,
             "telemetry": {"speed_mps": summary.speed_mps if summary else None,
                           "speed_limit_mps": summary.speed_limit_mps if summary else None,
                           "navigation_distance_m": summary.navigation_distance_m if summary else None,
                           "telemetry_age_s": summary.telemetry_age_s if summary else None}}
+    if perception is not None:
+        payload["perception"] = perception
+    return payload
 
 
 def serve(trusted_ui_image: str) -> None:
     pipe = WinPipe(trusted_ui_image)
     reader = TelemetryReader()
+    perception_reader = PerceptionReader()
     try:
         while True:
             pipe.connect()
@@ -291,25 +318,36 @@ def serve(trusted_ui_image: str) -> None:
                 versions = hello["payload"].get("supported_versions")
                 if (not isinstance(versions, list) or not versions or
                         any(not isinstance(version, str) for version in versions) or
-                        "1.0" not in versions):
+                        not any(version in ("1.0", "1.1") for version in versions)):
                     pipe.send(message("error", hello["id"], {"code": "UNSUPPORTED_VERSION"}))
                     continue
-                pipe.send(message("hello_ack", hello["id"], {"selected_version": "1.0"}))
+                selected_version = "1.1" if "1.1" in versions else "1.0"
+                pipe.send(message("hello_ack", hello["id"],
+                                  {"selected_version": selected_version},
+                                  version=selected_version))
                 counter = 0
-                pipe.send(message("config", "p-1", {"config": {"target_speed_mps": 0}}))
+                pipe.send(message("config", "p-1", {"config": {"target_speed_mps": 0}},
+                                  version=selected_version))
                 last_state = None
                 revision = 0
+                latest_frame = None
                 seen_requests = {hello["id"]}
                 while True:
                     summary = reader.read()
-                    candidate = status_payload(summary, revision)
+                    fresh_frame = perception_reader.read()
+                    if fresh_frame is not None:
+                        latest_frame = fresh_frame
+                    perception = (perception_payload(latest_frame, time.perf_counter_ns())
+                                  if selected_version == "1.1" else None)
+                    candidate = status_payload(summary, revision, perception)
                     state_key = (candidate["state"], candidate["error_code"])
                     if last_state is not None and state_key != last_state:
                         revision += 1
                     candidate["state_revision"] = revision
                     last_state = state_key
                     counter += 1
-                    pipe.send(message("status", f"p-{counter + 1}", candidate))
+                    pipe.send(message("status", f"p-{counter + 1}", candidate,
+                                      version=selected_version))
                     request = pipe.read_frame(250)
                     if request is None:
                         continue
@@ -321,9 +359,11 @@ def serve(trusted_ui_image: str) -> None:
                         raise ValueError("unsupported version")
                     kind = request["type"]
                     if kind == "get_status" and request["payload"] == {}:
-                        pipe.send(message("status", request["id"], candidate))
+                        pipe.send(message("status", request["id"], candidate,
+                                          version=selected_version))
                     elif kind == "disengage" and request["payload"] == {}:
-                        pipe.send(message("status", request["id"], candidate))
+                        pipe.send(message("status", request["id"], candidate,
+                                          version=selected_version))
                     elif kind == "engage":
                         requested_revision = request["payload"].get("state_revision")
                         code = ("CONTROL_UNAVAILABLE" if type(requested_revision) is int and requested_revision >= 0

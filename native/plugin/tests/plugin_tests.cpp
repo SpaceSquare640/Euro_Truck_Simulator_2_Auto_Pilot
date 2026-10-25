@@ -341,6 +341,31 @@ ETS2AP_TEST(PausedAndStartedPublishWithoutFrameEnd) {
   plugin.Shutdown();
 }
 
+ETS2AP_TEST(ControlSnapshotRequiresFreshUnpausedTelemetryAndSpeedLimit) {
+  const auto names = UniqueNames();
+  FakeSdk sdk;
+  TelemetryPlugin plugin;
+  CHECK_EQ(plugin.Init(sdk.params(), Options(names)), SCS_RESULT_ok);
+  sdk.Emit(SCS_TELEMETRY_EVENT_paused);
+  const auto speed_limit = FloatValue(20.0f);
+  sdk.Emit(SCS_TELEMETRY_TRUCK_CHANNEL_navigation_speed_limit, &speed_limit);
+  sdk.Emit(SCS_TELEMETRY_EVENT_frame_end);
+
+  auto safety = plugin.ControlSnapshot(1234567890ULL);
+  CHECK(!safety.fresh);
+  CHECK(safety.paused);
+  CHECK(safety.speed_limit_available);
+
+  sdk.Emit(SCS_TELEMETRY_EVENT_started);
+  safety = plugin.ControlSnapshot(1234567890ULL);
+  CHECK(safety.fresh);
+  CHECK(!safety.paused);
+  CHECK(safety.speed_limit_available);
+  safety = plugin.ControlSnapshot(1484567891ULL);
+  CHECK(!safety.fresh);
+  plugin.Shutdown();
+}
+
 ETS2AP_TEST(ConfigurationEventClearsAllValidity) {
   const auto names = UniqueNames();
   FakeSdk sdk;
@@ -371,6 +396,7 @@ ETS2AP_TEST(ShutdownPublishesInvalidSnapshotAndAllowsReinit) {
   TelemetryV1 after{};
   CHECK_EQ(TryReadSnapshot(reader.data(), reader.size(), &after), ReadStatus::Ok);
   CHECK_EQ(after.validity_flags, 0u);
+  reader.Close();
   CHECK_EQ(plugin.Init(sdk.params(), Options(names)), SCS_RESULT_ok);
   plugin.Shutdown();
 }

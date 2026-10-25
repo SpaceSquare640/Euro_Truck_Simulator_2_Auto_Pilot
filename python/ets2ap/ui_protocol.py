@@ -12,7 +12,7 @@ import struct
 import time
 
 MAX_FRAME = 65_536
-VERSION = "1.0"
+VERSION = "1.1"
 _ID = re.compile(r"^[up]-[A-Za-z0-9._-]{1,62}$", re.ASCII)
 _TIME = re.compile(r"^(0|[1-9][0-9]*)$", re.ASCII)
 _VERSION = re.compile(r"^[0-9]+\.[0-9]+$", re.ASCII)
@@ -76,6 +76,8 @@ def parse(data: bytes) -> dict:
     return value
 
 
-def message(kind: str, identifier: str, payload: dict) -> dict:
-    return {"type": kind, "version": VERSION, "id": identifier,
+def message(kind: str, identifier: str, payload: dict, *, version: str = VERSION) -> dict:
+    if version not in ("1.0", "1.1"):
+        raise ValueError("unsupported UI protocol version")
+    return {"type": kind, "version": version, "id": identifier,
             "timestamp": timestamp(), "payload": payload}

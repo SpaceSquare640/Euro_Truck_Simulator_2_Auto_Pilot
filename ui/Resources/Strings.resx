@@ -11,7 +11,7 @@
   <data name="Settings" xml:space="preserve"><value>Settings</value></data>
   <data name="Activity" xml:space="preserve"><value>Activity</value></data>
   <data name="DrivingOverview" xml:space="preserve"><value>Driving overview</value></data>
-  <data name="OverviewDescription" xml:space="preserve"><value>View live game telemetry and connection status. Auto pilot control is not available in this build.</value></data>
+  <data name="OverviewDescription" xml:space="preserve"><value>View live game telemetry and safety observations. Automatic driving remains disabled while required input and road-perception checks are unvalidated.</value></data>
   <data name="NotConnected" xml:space="preserve"><value>Not connected</value></data>
   <data name="NotConnectedDetail" xml:space="preserve"><value>Set up the connection to see live data.</value></data>
   <data name="SetUpConnection" xml:space="preserve"><value>Set up connection</value></data>
@@ -27,7 +27,21 @@
   <data name="ControlService" xml:space="preserve"><value>Control service</value></data>
   <data name="Pending" xml:space="preserve"><value>Pending</value></data>
   <data name="Engage" xml:space="preserve"><value>Engage auto pilot</value></data>
-  <data name="EngageUnavailable" xml:space="preserve"><value>Auto pilot remains disabled until native control is implemented.</value></data>
+  <data name="EngageUnavailable" xml:space="preserve"><value>Automatic driving remains disabled until physical-input monitoring and road perception are validated.</value></data>
+  <data name="AssistReadiness" xml:space="preserve"><value>Driving-assist readiness</value></data>
+  <data name="AssistReadinessDetail" xml:space="preserve"><value>Observations are informational. Input coverage and road detection are not validated, so they cannot authorize vehicle control.</value></data>
+  <data name="FrameCaptureLabel" xml:space="preserve"><value>Game frame capture</value></data>
+  <data name="GameFocusLabel" xml:space="preserve"><value>Game in foreground</value></data>
+  <data name="InputMonitoringLabel" xml:space="preserve"><value>Physical-input monitoring</value></data>
+  <data name="ManualInputLabel" xml:space="preserve"><value>Recent manual input</value></data>
+  <data name="LaneConfidenceLabel" xml:space="preserve"><value>Prototype lane confidence</value></data>
+  <data name="FrontObstacleLabel" xml:space="preserve"><value>Front-obstacle check</value></data>
+  <data name="LaneConfidenceFormat" xml:space="preserve"><value>{0:N0}%</value></data>
+  <data name="StatusActive" xml:space="preserve"><value>Active</value></data>
+  <data name="StatusInactive" xml:space="preserve"><value>Inactive</value></data>
+  <data name="StatusClear" xml:space="preserve"><value>Clear</value></data>
+  <data name="StatusNotClear" xml:space="preserve"><value>Not clear</value></data>
+  <data name="StatusNotValidated" xml:space="preserve"><value>Not validated</value></data>
   <data name="RecentActivity" xml:space="preserve"><value>Recent activity</value></data>
   <data name="NoRecentActivity" xml:space="preserve"><value>No recent activity</value></data>
   <data name="ActivityAfterConnect" xml:space="preserve"><value>Activity will appear here after the control service connects.</value></data>

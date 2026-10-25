@@ -32,8 +32,8 @@ internal sealed class UiPipeClient
                 await pipe.ConnectAsync(1000, cancellation);
                 if (!VerifyServer(pipe)) throw new UnauthorizedAccessException("Untrusted UI pipe server.");
                 string helloId = "u-1";
-                await SendAsync(pipe, new { type = "hello", version = "1.0", id = helloId,
-                    timestamp = QpcNanoseconds(), payload = new { supported_versions = new[] { "1.0" } } }, cancellation);
+                await SendAsync(pipe, new { type = "hello", version = "1.1", id = helloId,
+                    timestamp = QpcNanoseconds(), payload = new { supported_versions = new[] { "1.1", "1.0" } } }, cancellation);
                 UiStatusProtocol.ValidateHelloAck(await ReadAsync(pipe, cancellation), helloId);
                 while (!cancellation.IsCancellationRequested)
                 {

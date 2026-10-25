@@ -118,9 +118,27 @@ void TelemetryPlugin::Publish() {
         Log(SCS_LOG_TYPE_error, "Telemetry clock unavailable");
         return;
     }
-    if (!mapping_->Publish(state_.Build(*timestamp))) {
+    const auto sample = state_.Build(*timestamp);
+    if (!mapping_->Publish(sample)) {
         Log(SCS_LOG_TYPE_error, "Telemetry publication failed");
+        return;
     }
+    published_validity_flags_.store(sample.validity_flags, std::memory_order_relaxed);
+    published_paused_.store(sample.paused, std::memory_order_relaxed);
+    published_timestamp_ns_.store(sample.timestamp_ns, std::memory_order_release);
+}
+
+TelemetryControlSnapshot TelemetryPlugin::ControlSnapshot(std::uint64_t now_ns) const noexcept {
+    const auto timestamp = published_timestamp_ns_.load(std::memory_order_acquire);
+    const auto flags = published_validity_flags_.load(std::memory_order_relaxed);
+    const bool paused_available = (flags & static_cast<std::uint32_t>(ValidityBits::Paused)) != 0;
+    const bool speed_limit_available =
+        (flags & static_cast<std::uint32_t>(ValidityBits::SpeedLimit)) != 0;
+    const bool paused = paused_available &&
+        published_paused_.load(std::memory_order_relaxed) != 0;
+    const bool fresh = timestamp != 0 && timestamp <= now_ns &&
+        now_ns - timestamp <= 250'000'000ULL && paused_available && !paused;
+    return {fresh, paused, speed_limit_available};
 }
 
 void TelemetryPlugin::HandleEvent(scs_event_t event) {
@@ -197,7 +215,15 @@ void TelemetryPlugin::Shutdown() {
     }
     mapping_->Close();
     mapping_.reset();
+    published_validity_flags_.store(0, std::memory_order_relaxed);
+    published_paused_.store(0, std::memory_order_relaxed);
+    published_timestamp_ns_.store(0, std::memory_order_release);
     log_ = nullptr;
+}
+
+TelemetryPlugin& GlobalTelemetryPlugin() noexcept {
+    static TelemetryPlugin plugin;
+    return plugin;
 }
 
 } // namespace ets2ap::plugin

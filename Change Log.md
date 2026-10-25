@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here and published on the project website.
 
+## [Unreleased]
+
+### Added
+- UI IPC v1.1 perception summary and an Overview readiness panel for frame capture, focus, input monitoring, lane confidence, and front-obstacle status. (OpenAI-Codex_Responsible: Source_Code)
+- Added the internal `gameframe.v1` shared-memory contract and a native D3D11 Present capture prototype; WPF prefers its fresh frames and keeps GDI capture as fallback. In-game hook compatibility is unverified. (OpenAI-Codex_Responsible: Source_Code)
+- Added a 160 × 90 RGB24 perception mapping and WPF desktop capture/input-monitor publisher. The lane estimator is a prototype; the front-clear detector remains unvalidated and disabled by default. (OpenAI-Codex_Responsible: Source_Code)
+- Added a bounded supervised lane-centering and speed-control policy that remains neutral unless telemetry, capture, focus, input monitoring, UI authorization, lane confidence, and a validated front detector all pass. (OpenAI-Codex_Responsible: Source_Code)
+- Added Control.v1.1 safety-claim packets and server capability negotiation; the client will not engage with a legacy server, and native engagement stays blocked while its local input-monitor gate is unavailable. (OpenAI-Codex_Responsible: Source_Code)
+
+### Changed
+- Native UI authorization now fails closed; WPF input-monitor health remains unavailable until physical-device coverage is validated. Corrected Raw Input mouse-button release tracking. (OpenAI-Codex_Responsible: Source_Code)
+- Documented the current fixed 0.30 steering cap and marked speed-dependent steering calibration as unfinished. (OpenAI-Codex_Responsible: Source_Code)
+- Linked the perception mapping contract from the shared IPC overview and architecture; documented capture, controller-coverage, and detector-validation limits. (OpenAI-Codex_Responsible: Source_Code)
+- Set `ETS2AP_TEST_PYTHON` from the configured Python installation for native Control.v1 smoke tests in CI and release builds. (OpenAI-Codex_Responsible: Source_Code)
+- The MSI license text conversion now removes triple-star emphasis markers and rejects leftover asterisks. (OpenAI-Codex_Responsible: Source_Code)
+- The application source code and software use the PolyForm Noncommercial License 1.0.0; website content remains CC BY-NC-SA 4.0 and website source code uses PolyForm Noncommercial License 1.0.0. The connector ZIP carries the SCS SDK MIT notice. (OpenAI-Codex_Responsible: Source_Code)
+
 ## [0.0.1] - 2026-10-25
 
 ### Added
@@ -42,13 +59,6 @@ All notable changes to this project are documented here and published on the pro
 - Release and Sync Docs workflows use least-privilege permissions; Change Log.md is validated before it is synced to the website; releases are restricted to tags on Source_Code; `generate_release_notes` is no longer used. (OpenAI-Codex_Responsible: Source_Code)
 - CI module detection no longer uses `ls | grep` and writes its outputs in one block, which fixes the Actionlint shellcheck findings. (OpenAI-Codex_Responsible: Source_Code)
 - Release packages are now the connector ZIP and the MSI installer; the additional installer wrapper was removed because its failures could not be diagnosed. (OpenAI-Codex_Responsible: Source_Code)
-
-## [Unreleased]
-
-### Changed
-- Set `ETS2AP_TEST_PYTHON` from the configured Python installation for native Control.v1 smoke tests in CI and release builds. (OpenAI-Codex_Responsible: Source_Code)
-- The MSI license text conversion now removes triple-star emphasis markers and rejects leftover asterisks. (OpenAI-Codex_Responsible: Source_Code)
-- The application source code and software use the PolyForm Noncommercial License 1.0.0; website content remains CC BY-NC-SA 4.0 and website source code uses PolyForm Noncommercial License 1.0.0. The connector ZIP carries the SCS SDK MIT notice. (OpenAI-Codex_Responsible: Source_Code)
 
 ## [0.0.3] - 2026-10-25
 
