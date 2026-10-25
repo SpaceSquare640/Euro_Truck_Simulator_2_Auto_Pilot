@@ -102,6 +102,8 @@ internal static class ConnectorPackage
     internal const long MaximumArchiveBytes = 32L * 1024 * 1024;
     private const int MaximumManifestBytes = 64 * 1024;
     private const int MaximumDllBytes = 16 * 1024 * 1024;
+    private const int MaximumThirdPartyLicenseBytes = 16 * 1024;
+    private const string SdkLicensePath = "licenses/scs-sdk-mit.txt";
     private static readonly HashSet<string> AllowedNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "ets2ap_plugin.dll",
@@ -134,7 +136,8 @@ internal static class ConnectorPackage
                     throw new InvalidDataException("Connector ZIP contains an unsafe or duplicate path.");
 
                 if (path is not "manifest.json" and not "plugins/" and
-                    not "plugins/ets2ap_plugin.dll" and not "plugins/ets2ap_input.dll")
+                    not "plugins/ets2ap_plugin.dll" and not "plugins/ets2ap_input.dll" and
+                    not SdkLicensePath)
                     throw new InvalidDataException("Connector ZIP contains an unexpected file.");
             }
 
@@ -163,6 +166,32 @@ internal static class ConnectorPackage
                 string hash = hashElement.GetString() ?? string.Empty;
                 if (!AllowedNames.Contains(name) || !DigestPattern.IsMatch(hash) || !declared.TryAdd(name, hash))
                     throw new InvalidDataException("Connector ZIP manifest contains an invalid or duplicate DLL.");
+            }
+
+            bool hasSdkLicense = entries.TryGetValue(SdkLicensePath, out ZipArchiveEntry? sdkLicenseEntry);
+            if (root.TryGetProperty("third_party_licenses", out JsonElement thirdPartyLicenses))
+            {
+                if (thirdPartyLicenses.ValueKind != JsonValueKind.Array || thirdPartyLicenses.GetArrayLength() != 1)
+                    throw new InvalidDataException("Connector ZIP manifest has an invalid third-party license list.");
+                JsonElement license = thirdPartyLicenses[0];
+                if (license.ValueKind != JsonValueKind.Object ||
+                    !license.TryGetProperty("path", out JsonElement licensePath) ||
+                    licensePath.ValueKind != JsonValueKind.String || licensePath.GetString() != SdkLicensePath ||
+                    !license.TryGetProperty("sha256", out JsonElement licenseHash) ||
+                    licenseHash.ValueKind != JsonValueKind.String ||
+                    !DigestPattern.IsMatch(licenseHash.GetString() ?? string.Empty) ||
+                    !hasSdkLicense || sdkLicenseEntry is null ||
+                    sdkLicenseEntry.Length is <= 0 or > MaximumThirdPartyLicenseBytes)
+                    throw new InvalidDataException("Connector ZIP third-party license record is invalid.");
+
+                byte[] sdkLicenseBytes = ReadEntry(sdkLicenseEntry, MaximumThirdPartyLicenseBytes);
+                string actualLicenseHash = Convert.ToHexString(SHA256.HashData(sdkLicenseBytes));
+                if (!string.Equals(actualLicenseHash, licenseHash.GetString(), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Connector ZIP third-party license digest does not match its manifest.");
+            }
+            else if (hasSdkLicense)
+            {
+                throw new InvalidDataException("Connector ZIP contains an undeclared third-party license file.");
             }
 
             if (!declared.ContainsKey("ets2ap_plugin.dll") || declared.Count is < 1 or > 2 ||

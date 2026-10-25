@@ -22,9 +22,14 @@ public partial class MainWindow : Window
     private readonly UiPreferences _preferences = UiPreferences.Load();
     private readonly NavigationState _navigation = new();
     private readonly CancellationTokenSource _serviceCancellation = new();
+    private readonly PythonServiceRestartPolicy _serviceRestartPolicy = new();
     private readonly ObservableCollection<ActivityItem> _activityEntries = new();
     private readonly ObservableCollection<ActivityItem> _recentActivityEntries = new();
     private UiPipeClient? _service;
+    private Process? _pythonServiceProcess;
+    private string? _pythonInstallRoot;
+    private string? _uiExecutable;
+    private bool _isClosing;
     private bool _installingConnector;
     private bool _hasObservedServiceConnection;
     private bool _serviceConnected;
@@ -108,7 +113,9 @@ public partial class MainWindow : Window
 
     private void Window_Closed(object? sender, EventArgs e)
     {
+        _isClosing = true;
         _serviceCancellation.Cancel();
+        StopPythonService();
         _serviceCancellation.Dispose();
         SystemParameters.StaticPropertyChanged -= SystemParameters_StaticPropertyChanged;
         SystemEvents.UserPreferenceChanged -= SystemEvents_UserPreferenceChanged;
@@ -228,22 +235,117 @@ public partial class MainWindow : Window
 
     private void StartServiceConnection()
     {
-        string[] args = Environment.GetCommandLineArgs();
-        int index = Array.IndexOf(args, "--trusted-python-image");
-        if (index < 0 || index + 1 >= args.Length) return;
+        string installRoot = Path.GetFullPath(AppContext.BaseDirectory);
+        string? uiExecutable = Environment.ProcessPath;
+        if (uiExecutable is null || !PythonServiceLauncher.IsAvailable(installRoot, uiExecutable))
+        {
+            ApplyStatus(null);
+            return;
+        }
+
+        _pythonInstallRoot = installRoot;
+        _uiExecutable = Path.GetFullPath(uiExecutable);
         try
         {
-            _service = new UiPipeClient(args[index + 1]);
+            _service = new UiPipeClient(PythonServiceLauncher.RuntimePath(installRoot));
             _service.StatusChanged += status =>
             {
                 if (!Dispatcher.HasShutdownStarted)
                     _ = Dispatcher.BeginInvoke(new Action(() => ApplyStatus(status)));
             };
             _ = _service.RunAsync(_serviceCancellation.Token);
+            StartPythonService();
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or
+            InvalidOperationException or System.ComponentModel.Win32Exception or System.Security.SecurityException)
         {
+            StopPythonService();
             ApplyStatus(null);
+        }
+    }
+
+    private void StartPythonService()
+    {
+        if (_isClosing || _pythonInstallRoot is null || _uiExecutable is null) return;
+        Process? process = null;
+        try
+        {
+            process = new Process
+            {
+                StartInfo = PythonServiceLauncher.CreateStartInfo(_pythonInstallRoot, _uiExecutable),
+                EnableRaisingEvents = true
+            };
+            process.Exited += PythonServiceProcess_Exited;
+            _pythonServiceProcess = process;
+            if (process.Start()) return;
+            _pythonServiceProcess = null;
+            process.Exited -= PythonServiceProcess_Exited;
+            process.Dispose();
+            ApplyStatus(null);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or
+            InvalidOperationException or System.ComponentModel.Win32Exception or System.Security.SecurityException)
+        {
+            if (process is not null)
+            {
+                _pythonServiceProcess = null;
+                process.Exited -= PythonServiceProcess_Exited;
+                process.Dispose();
+            }
+            ApplyStatus(null);
+        }
+    }
+
+    private void PythonServiceProcess_Exited(object? sender, EventArgs e)
+    {
+        if (sender is not Process process || Dispatcher.HasShutdownStarted) return;
+        try
+        {
+            _ = Dispatcher.BeginInvoke(new Action(() => HandlePythonServiceExit(process)));
+        }
+        catch (InvalidOperationException)
+        {
+            process.Dispose();
+        }
+    }
+
+    private void HandlePythonServiceExit(Process process)
+    {
+        if (!ReferenceEquals(_pythonServiceProcess, process))
+        {
+            process.Dispose();
+            return;
+        }
+
+        _pythonServiceProcess = null;
+        process.Exited -= PythonServiceProcess_Exited;
+        process.Dispose();
+        ApplyStatus(null);
+        if (!_isClosing && _serviceRestartPolicy.TryConsumeRestart())
+            StartPythonService();
+    }
+
+    private void StopPythonService()
+    {
+        Process? process = _pythonServiceProcess;
+        _pythonServiceProcess = null;
+        if (process is null) return;
+        process.Exited -= PythonServiceProcess_Exited;
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                _ = process.WaitForExit(2000);
+            }
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or
+            NotSupportedException)
+        {
+        }
+        finally
+        {
+            process.Dispose();
         }
     }
 

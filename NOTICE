@@ -2,23 +2,12 @@ Euro Truck Simulator 2 Auto Pilot
 Copyright (c) 2026 Kingsley
 
 This project is source-available, NOT open source.
-It is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike
-4.0 International License (CC BY-NC-SA 4.0). See LICENSE for the full text.
+Application source code and software in this repository are licensed under the
+PolyForm Noncommercial License 1.0.0. See LICENSE for the full terms.
 
-Attribution requirement
------------------------
-Any copy, build, modification or redistribution of this work, in whole or in
-part, MUST clearly credit the original developer:
-
-    Original developer: Kingsley
-    Source: https://github.com/SpaceSquare640/Euro_Truck_Simulator_2_Auto_Pilot
-
-and MUST indicate whether changes were made.
-
-Non-commercial
---------------
-Use for commercial purposes, profit, or any activity that generates revenue is
-prohibited.
+The separate project website's content (text and images) is licensed under
+CC BY-NC-SA 4.0. The website source code is licensed under the PolyForm
+Noncommercial License 1.0.0.
 
 Disclaimer
 ----------
@@ -33,5 +22,10 @@ Third-party components
 ----------------------
 SCS Telemetry and Input SDK 1.16 (headers only), in third_party/scs_sdk/
 Copyright (C) 2016 SCS Software. MIT License, see third_party/scs_sdk/sdk_license.txt.
+
+CPython 3.13.17 x64 embeddable runtime, bundled in the Windows MSI under runtime/.
+Python Software Foundation License Version 2; the full license is included as runtime/LICENSE.txt.
+
+Updated by: OpenAI-Codex_Responsible: Source_Code
 
 <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->

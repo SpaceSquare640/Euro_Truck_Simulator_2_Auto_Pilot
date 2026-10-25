@@ -1,7 +1,7 @@
 # Contributing
 
 Thank you for your interest. Please read [LICENSE](LICENSE) and [NOTICE](NOTICE) first:
-this project is source-available under CC BY-NC-SA 4.0 and may not be used commercially.
+the application source code and software are source-available under the PolyForm Noncommercial License 1.0.0. Website content (text and images) is licensed under CC BY-NC-SA 4.0; website source code is licensed under the PolyForm Noncommercial License 1.0.0.
 
 ## Branches
 | Branch | Purpose |
@@ -34,7 +34,7 @@ Every user-visible change adds an entry to `Change Log.md` under `[Unreleased]`
 7. Tags and releases are created by the maintainer. Deleting or rewriting a tag is destructive and requires the maintainer's explicit approval.
 
 ## Dependency Licenses
-Allowed: MIT, BSD-2/3-Clause, Apache-2.0, Zlib, ISC. GPL-family licenses are not allowed.
+Allowed: MIT, BSD-2/3-Clause, Apache-2.0, Zlib, ISC, and PSF-2.0 for the approved bundled CPython 3.13.17 runtime. MS-RL is approved only for the exact WiX packages used by CI to build the MSI; it is not shipped with the app. GPL-family licenses are not allowed; ask before adding any other license.
 
 ## Tasks
 Planned work is tracked as GitHub Issues using the **Task** template.

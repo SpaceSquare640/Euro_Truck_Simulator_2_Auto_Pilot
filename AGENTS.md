@@ -10,7 +10,8 @@ These rules add to, and never override, higher-priority instructions.
 
 ## Project Facts
 - Platform: Windows 10/11 only.
-- License: CC BY-NC-SA 4.0, copyright Kingsley. Source-available, not open source.
+- License: PolyForm Noncommercial License 1.0.0, copyright Kingsley. Source-available, not open source.
+- Separate project website: content (text and images) is CC BY-NC-SA 4.0; website source code is PolyForm Noncommercial License 1.0.0.
 - Language of code, comments, docs, commits: English.
 - User-facing text must be localizable (see i18n).
 
@@ -38,7 +39,8 @@ See `docs/ARCHITECTURE.md`. Modules talk only through the versioned IPC contract
 - Use Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `ci:`, `chore:`.
 
 ## Dependencies
-- Allowed licenses: MIT, BSD-2/3-Clause, Apache-2.0, Zlib, ISC.
+- Allowed licenses: MIT, BSD-2/3-Clause, Apache-2.0, Zlib, ISC, and PSF-2.0 for the approved bundled CPython 3.13.17 runtime.
+- MS-RL is approved only for the exact WiX packages used by CI to build the MSI; it is not shipped with the app.
 - Forbidden: GPL, LGPL, AGPL, and anything restricting non-commercial ShareAlike redistribution. Ask before adding any other license.
 
 ## i18n
@@ -54,3 +56,5 @@ See `docs/ARCHITECTURE.md`. Modules talk only through the versioned IPC contract
 - Every report must be a single copyable ```text block starting with `[REPORT] OpenAI-Codex_Responsible: Source_Code`, with fields: Task, Status, Changed files, Commits, Verification, Issues / Questions.
 
 <!-- Edited by: Anthropic-Claude_Code -->
+
+<!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->

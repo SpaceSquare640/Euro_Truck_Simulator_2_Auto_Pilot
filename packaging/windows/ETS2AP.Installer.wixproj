@@ -6,8 +6,10 @@
     <InstallerPlatform>x64</InstallerPlatform>
     <AppVersion Condition="'$(AppVersion)' == ''">1.0.0</AppVersion>
     <PublishDirectory Condition="'$(PublishDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\build\ui-publish</PublishDirectory>
+    <PythonRuntimeDirectory Condition="'$(PythonRuntimeDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\build\python-runtime-payload</PythonRuntimeDirectory>
+    <PythonModuleDirectory Condition="'$(PythonModuleDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\build\python\ets2ap</PythonModuleDirectory>
     <LicenseRtf Condition="'$(LicenseRtf)' == ''">$(MSBuildProjectDirectory)\..\..\build\license.rtf</LicenseRtf>
-    <DefineConstants>$(DefineConstants);AppVersion=$(AppVersion);PublishDirectory=$(PublishDirectory);LicenseRtf=$(LicenseRtf)</DefineConstants>
+    <DefineConstants>$(DefineConstants);AppVersion=$(AppVersion);PublishDirectory=$(PublishDirectory);PythonRuntimeDirectory=$(PythonRuntimeDirectory);PythonModuleDirectory=$(PythonModuleDirectory);LicenseRtf=$(LicenseRtf)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />

@@ -10,13 +10,20 @@
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="ETS2 Auto Pilot" />
+      <Directory Id="INSTALLFOLDER" Name="ETS2 Auto Pilot">
+        <Directory Id="PythonRuntimeFolder" Name="runtime" />
+        <Directory Id="PythonServiceFolder" Name="python">
+          <Directory Id="PythonModulesFolder" Name="ets2ap" />
+        </Directory>
+      </Directory>
     </StandardDirectory>
     <Feature Id="Main" Title="ETS2 Auto Pilot" Level="1">
       <Files Include="$(var.PublishDirectory)\**" Directory="INSTALLFOLDER">
         <Exclude Files="$(var.PublishDirectory)\**\*.pdb" />
         <Exclude Files="$(var.PublishDirectory)\ETS2AP.Ui.exe" />
       </Files>
+      <Files Include="$(var.PythonRuntimeDirectory)\**" Directory="PythonRuntimeFolder" />
+      <Files Include="$(var.PythonModuleDirectory)\**" Directory="PythonModulesFolder" />
       <Component Id="ApplicationExecutable" Directory="INSTALLFOLDER" Guid="*">
         <File Id="ApplicationExecutableFile"
               Source="$(var.PublishDirectory)\ETS2AP.Ui.exe"
@@ -27,6 +34,14 @@
                     WorkingDirectory="INSTALLFOLDER"
                     Advertise="yes" />
         </File>
+      </Component>
+      <Component Id="TrustedPythonRuntimeLocation" Directory="INSTALLFOLDER" Bitness="always64" Guid="*">
+        <RegistryValue Root="HKLM"
+                       Key="Software\Kingsley\ETS2 Auto Pilot"
+                       Name="InstallLocation"
+                       Type="string"
+                       Value="[INSTALLFOLDER]"
+                       KeyPath="yes" />
       </Component>
     </Feature>
 

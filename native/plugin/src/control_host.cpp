@@ -145,6 +145,32 @@ input::CommandResult ControlHost::AcceptCommand(std::span<const std::byte> packe
     }
 }
 
+input::ControlSnapshot ControlHost::Snapshot() noexcept {
+    try {
+        const std::lock_guard lock(operation_mutex_);
+        return core_.Snapshot();
+    } catch (...) {
+        return {};
+    }
+}
+
+std::optional<std::array<std::byte, 64>> ControlHost::EncodeStatus() noexcept {
+    try {
+        const std::lock_guard lock(operation_mutex_);
+        const auto now_ns = ReadNowNsLocked();
+        if (!now_ns || *now_ns == 0) {
+            core_.Disconnect();
+            ForceNeutralLocked();
+            return std::nullopt;
+        }
+        core_.Tick(*now_ns);
+        return core_.EncodeStatus(*now_ns);
+    } catch (...) {
+        ForceNeutralLocked();
+        return std::nullopt;
+    }
+}
+
 void ControlHost::SetManualInput(bool active) noexcept {
     try {
         const std::lock_guard lock(operation_mutex_);

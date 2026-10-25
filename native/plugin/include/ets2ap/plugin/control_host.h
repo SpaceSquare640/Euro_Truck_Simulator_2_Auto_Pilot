@@ -3,6 +3,7 @@
 
 #include "ets2ap/input/control_core.h"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -36,6 +37,8 @@ public:
     bool Connect() noexcept;
     input::CommandResult AcceptCommand(std::span<const std::byte> packet,
                                        const input::SafetyGates& gates = {}) noexcept;
+    input::ControlSnapshot Snapshot() noexcept;
+    std::optional<std::array<std::byte, 64>> EncodeStatus() noexcept;
     void SetManualInput(bool active) noexcept;
     void Disconnect() noexcept;
 

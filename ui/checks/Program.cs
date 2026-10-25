@@ -1,5 +1,6 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 using System.Collections;
+using System.Diagnostics;
 using System.IO.Compression;
 using System.IO;
 using System.Net;
@@ -31,6 +32,7 @@ internal static class Program
             ("Preferences parsing and round trip", CheckPreferences),
             ("Navigation state and shortcuts", CheckNavigation),
             ("UI status protocol", CheckStatusProtocol),
+            ("Bundled Python service launch and restart policy", CheckPythonServiceLaunchConfiguration),
             ("Connector release metadata", CheckConnectorReleaseMetadata),
             ("Connector release download", CheckConnectorReleaseDownload),
             ("Connector archive validation", CheckConnectorArchiveValidation),
@@ -192,6 +194,27 @@ internal static class Program
             "Overflowing number was accepted.");
     }
 
+    private static void CheckPythonServiceLaunchConfiguration()
+    {
+        string installRoot = Path.Combine(Path.GetTempPath(), "ETS2AP-install");
+        string uiExecutable = Path.Combine(installRoot, "ETS2AP.Ui.exe");
+        ProcessStartInfo start = PythonServiceLauncher.CreateStartInfo(installRoot, uiExecutable);
+        Require(start.FileName == Path.GetFullPath(Path.Combine(installRoot, "runtime", "python.exe")),
+            "The service must use the bundled runtime under the fixed install root.");
+        Require(start.WorkingDirectory == Path.GetFullPath(installRoot),
+            "The service working directory must be the app install root.");
+        Require(!start.UseShellExecute && start.CreateNoWindow && start.WindowStyle == ProcessWindowStyle.Hidden,
+            "The service must launch without a shell or visible console window.");
+        Require(start.ArgumentList.SequenceEqual(new[]
+        {
+            "-I", "-S", "-m", "ets2ap.ui_server", "--trusted-ui-image", Path.GetFullPath(uiExecutable)
+        }), "The service must receive fixed module arguments and the canonical UI image path separately.");
+
+        var restartPolicy = new PythonServiceRestartPolicy();
+        Require(restartPolicy.TryConsumeRestart(), "One automatic restart should be allowed after service exit.");
+        Require(!restartPolicy.TryConsumeRestart(), "Automatic restarts must be bounded to avoid a crash loop.");
+    }
+
     private static void CheckQpcClock()
     {
         Require(QueryPerformanceFrequency(out long frequency) && frequency > 0, "QPC frequency unavailable.");
@@ -241,6 +264,13 @@ internal static class Program
         byte[] archive = BuildConnectorArchive("1.2.3-beta.1");
         var files = ConnectorPackage.ReadValidated(archive, "1.2.3-beta.1");
         Require(files.Count == 1 && files.ContainsKey("ets2ap_plugin.dll"), "Valid connector DLL was not extracted.");
+
+        byte[] licensedArchive = BuildConnectorArchive("1.2.3-beta.1", includeSdkLicense: true);
+        var licensedFiles = ConnectorPackage.ReadValidated(licensedArchive, "1.2.3-beta.1");
+        Require(licensedFiles.Count == 1 && licensedFiles.ContainsKey("ets2ap_plugin.dll"),
+            "A connector package with its declared SCS SDK license was rejected or installed as a DLL.");
+        Require(RejectPackage(BuildConnectorArchive("1.2.3-beta.1", includeSdkLicense: true, tamperSdkLicense: true),
+            "1.2.3-beta.1"), "A package with a mismatched third-party license digest was accepted.");
 
         Require(RejectPackage(BuildConnectorArchive("1.2.3"), "1.2.3-beta.1"),
             "A package for a different version was accepted.");
@@ -349,23 +379,45 @@ internal static class Program
         string name = "ets2ap_plugin.dll",
         string entryPath = "plugins/ets2ap_plugin.dll",
         byte[]? dllContent = null,
-        string? declaredHash = null)
+        string? declaredHash = null,
+        bool includeSdkLicense = false,
+        bool tamperSdkLicense = false)
     {
         dllContent ??= [0x4d, 0x5a, 0x01, 0x02];
         string hash = declaredHash ?? Convert.ToHexString(SHA256.HashData(dllContent)).ToLowerInvariant();
-        string manifest = JsonSerializer.Serialize(new
+        var manifestFields = new Dictionary<string, object>
         {
-            format = 1,
-            version,
-            files = new[] { new { name, sha256 = hash } }
-        });
+            ["format"] = 1,
+            ["version"] = version,
+            ["files"] = new[] { new { name, sha256 = hash } }
+        };
+        byte[]? sdkLicenseBytes = null;
+        byte[]? sdkLicenseArchiveBytes = null;
+        if (includeSdkLicense)
+        {
+            sdkLicenseBytes = Encoding.UTF8.GetBytes("SCS SDK\nCopyright (C) 2016 SCS Software\n\nPermission notice.\n");
+            sdkLicenseArchiveBytes = tamperSdkLicense
+                ? Encoding.UTF8.GetBytes("altered license text")
+                : sdkLicenseBytes;
+            string sdkLicenseHash = Convert.ToHexString(SHA256.HashData(sdkLicenseBytes)).ToLowerInvariant();
+            manifestFields["third_party_licenses"] = new[]
+            {
+                new { path = "licenses/scs-sdk-mit.txt", sha256 = sdkLicenseHash }
+            };
+        }
+        string manifest = JsonSerializer.Serialize(manifestFields);
         using var output = new MemoryStream();
         using (var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
         {
             using (var writer = new StreamWriter(zip.CreateEntry("manifest.json").Open(), new UTF8Encoding(false)))
                 writer.Write(manifest);
-            using var dll = zip.CreateEntry(entryPath).Open();
-            dll.Write(dllContent);
+            using (var dll = zip.CreateEntry(entryPath).Open())
+                dll.Write(dllContent);
+            if (sdkLicenseArchiveBytes is not null)
+            {
+                using var license = zip.CreateEntry("licenses/scs-sdk-mit.txt").Open();
+                license.Write(sdkLicenseArchiveBytes);
+            }
         }
         return output.ToArray();
     }
