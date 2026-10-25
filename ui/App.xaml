@@ -1,7 +1,6 @@
 <Application x:Class="ETS2AP.Ui.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             StartupUri="MainWindow.xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
   <Application.Resources>
     <ResourceDictionary>

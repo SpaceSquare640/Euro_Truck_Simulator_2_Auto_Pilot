@@ -1,0 +1,15 @@
+<!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>ETS2AP_$(AppVersion)_x64_en-US</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <AppVersion Condition="'$(AppVersion)' == ''">1.0.0</AppVersion>
+    <PublishDirectory Condition="'$(PublishDirectory)' == ''">$(MSBuildProjectDirectory)\..\..\build\ui-publish</PublishDirectory>
+    <LicenseRtf Condition="'$(LicenseRtf)' == ''">$(MSBuildProjectDirectory)\..\..\build\license.rtf</LicenseRtf>
+    <DefineConstants>$(DefineConstants);AppVersion=$(AppVersion);PublishDirectory=$(PublishDirectory);LicenseRtf=$(LicenseRtf)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />
+  </ItemGroup>
+</Project>

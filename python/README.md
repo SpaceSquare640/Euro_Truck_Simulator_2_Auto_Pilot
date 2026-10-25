@@ -8,3 +8,5 @@ From the Source Code directory, set `PYTHONPATH=python` and run `python -m ets2a
 The server creates a single-client, byte-stream Windows named pipe with a current-user DACL, remote-client rejection, first-instance ownership, and overlapped I/O. It accepts `hello`, `get_status`, and `disengage` for status-only use. `set_config` and actual engagement are not implemented. Missing, invalid, or stale telemetry never makes the service ready.
 
 Offline checks: set `PYTHONPATH=python` and run `python -m unittest discover -s python/tests -v`. These checks do not prove game telemetry, native control, installer behavior, or cross-process security outside the current Windows execution environment.
+
+GitHub Actions detects this module by its `ets2ap/` and `tests/` directories, compiles the package, and runs the standard-library `unittest` suite. The current Python module has no third-party package dependencies.

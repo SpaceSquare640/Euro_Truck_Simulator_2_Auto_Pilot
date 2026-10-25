@@ -44,9 +44,14 @@
   <data name="FolderAccepted" xml:space="preserve"><value>Game folder found.</value></data>
   <data name="FolderInvalid" xml:space="preserve"><value>Choose the Euro Truck Simulator 2 folder containing bin\win_x64\eurotrucks2.exe.</value></data>
   <data name="ConnectorInstallation" xml:space="preserve"><value>Game connector</value></data>
-  <data name="ConnectorInstallationDescription" xml:space="preserve"><value>The connector lets this external app read game telemetry. Installation will be offered with the complete app package.</value></data>
+  <data name="ConnectorInstallationDescription" xml:space="preserve"><value>Download the checksum-verified connector from the project's GitHub Release and install it in the game folder. This does not change your control bindings.</value></data>
   <data name="InstallConnector" xml:space="preserve"><value>Install connector</value></data>
   <data name="ConnectorUnavailable" xml:space="preserve"><value>Connector installation is unavailable in this build.</value></data>
+  <data name="ConnectorInstallElevationPrompt" xml:space="preserve"><value>Windows will ask for permission, then download and install the connector from GitHub.</value></data>
+  <data name="ConnectorInstallSuccess" xml:space="preserve"><value>Connector installed. Your control bindings were not changed.</value></data>
+  <data name="ConnectorInstallFailed" xml:space="preserve"><value>Connector installation failed. Check the game folder and permissions, then try again.</value></data>
+  <data name="ConnectorInstallCancelled" xml:space="preserve"><value>Connector installation was cancelled.</value></data>
+  <data name="ConnectorGameMustBeClosed" xml:space="preserve"><value>Close Euro Truck Simulator 2 before installing the connector.</value></data>
   <data name="ServiceUnavailable" xml:space="preserve"><value>The control service is not included in this build.</value></data>
   <data name="SettingsTitle" xml:space="preserve"><value>Settings</value></data>
   <data name="Appearance" xml:space="preserve"><value>Appearance</value></data>

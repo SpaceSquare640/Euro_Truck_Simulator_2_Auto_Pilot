@@ -1,9 +1,6 @@
 # Edited by: Anthropic-Claude_Code
 # Edited by: OpenAI-Codex_Responsible: Source_Code
-# Builds a GitHub Release from the matching section of Change Log.md.
-# A pushed v* tag publishes. A manual run is a preview only and never publishes.
-# TODO: when native / python / ui packages exist, build them in separate jobs with contents: read
-# and keep contents: write on the publish job only.
+# Builds release assets on Windows and publishes only pushed stable tags.
 name: Release
 
 on:
@@ -24,10 +21,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
     env:
       EVENT_NAME: ${{ github.event_name }}
       REF_NAME: ${{ github.ref_name }}
@@ -44,22 +43,27 @@ jobs:
           pattern='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
           if [ "$EVENT_NAME" = "push" ]; then
             TAG="$REF_NAME"
-            printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
-              || { echo "::error::Tag is not vMAJOR.MINOR.PATCH[-prerelease]"; exit 1; }
+            printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              || { echo "::error::Published tags must use vMAJOR.MINOR.PATCH"; exit 1; }
             VERSION="${TAG#v}"
+            CHANGELOG_VERSION="$VERSION"
             PUBLISH=true
           else
             TAG=""
-            VERSION="$INPUT_VERSION"
-            if [ "$VERSION" != "Unreleased" ]; then
-              printf '%s' "$VERSION" | grep -Eq "$pattern" \
+            CHANGELOG_VERSION="$INPUT_VERSION"
+            if [ "$CHANGELOG_VERSION" = "Unreleased" ]; then
+              VERSION="0.0.0-preview.${GITHUB_RUN_NUMBER}"
+            else
+              printf '%s' "$CHANGELOG_VERSION" | grep -Eq "$pattern" \
                 || { echo "::error::Invalid version input"; exit 1; }
+              VERSION="$CHANGELOG_VERSION"
             fi
             PUBLISH=false
           fi
           {
             echo "tag=$TAG"
             echo "version=$VERSION"
+            echo "changelog_version=$CHANGELOG_VERSION"
             echo "publish=$PUBLISH"
           } >> "$GITHUB_OUTPUT"
 
@@ -72,7 +76,7 @@ jobs:
 
       - name: Extract release notes from Change Log.md
         env:
-          VERSION: ${{ steps.v.outputs.version }}
+          VERSION: ${{ steps.v.outputs.changelog_version }}
         run: |
           set -euo pipefail
           bash .github/scripts/extract-release-notes.sh "$VERSION" "Change Log.md" > "$RUNNER_TEMP/notes.md"
@@ -95,9 +99,31 @@ jobs:
           fi
           {
             cat "$RUNNER_TEMP/notes.md"
+            cat <<'INSTALL'
+
+          ## Installation
+
+          Choose one application installer: the setup EXE and the MSI install the same application. Do not install both. The EXE launches the included MSI; the MSI can also be opened directly with Windows Installer.
+
+          After installing and launching the app, use **Install connector** to download the versioned connector ZIP from GitHub Releases. The app verifies the release digest and package manifest before installing the DLL into the selected ETS2 plugins folder.
+
+          ## Release assets
+
+          - `ETS2AP_DLL_V<version>.zip` — game connector downloaded by the app.
+          - `ETS2AP_V<version>_x64-setup.exe` — setup EXE wrapping the MSI.
+          - `ETS2AP_V<version>_x64_en-US.msi` — Windows Installer package.
+          INSTALL
             printf '\n\n## Contributors\n- Kingsley\n- Anthropic Claude Code\n- OpenAI Codex\n- Bots: github-actions[bot], dependabot[bot]\n\n**Full Changelog**: %s\n' "$LINK"
           } > "$RUNNER_TEMP/release-body.md"
           echo "body lines: $(wc -l < "$RUNNER_TEMP/release-body.md")"
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-body.md
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Preview (manual runs never publish)
         if: steps.v.outputs.publish != 'true'
@@ -108,11 +134,85 @@ jobs:
             cat "$RUNNER_TEMP/release-body.md"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  package:
+    needs: prepare
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            10.0.x
+            6.0.x
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build native plugin and run tests
+        run: |
+          cmake -S native -B build/native -A x64
+          cmake --build build/native --config Release
+          ctest --test-dir build/native -C Release --output-on-failure
+      - name: Compile and test Python module
+        working-directory: python
+        run: |
+          python -m compileall -q ets2ap tests
+          python -m unittest discover -s tests -v
+      - name: Publish self-contained x64 WPF app
+        run: dotnet publish ui/ETS2AP.Ui.csproj --configuration Release --runtime win-x64 --self-contained true --output build/ui-publish
+      - name: Run WPF checks
+        run: dotnet run --project ui/checks/ETS2AP.Ui.Checks.csproj --configuration Release
+      - name: Build connector ZIP, MSI, and setup EXE
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          ./packaging/windows/build-release-packages.ps1 `
+            -Version $env:RELEASE_VERSION `
+            -PublishDirectory ./build/ui-publish `
+            -NativePlugin ./build/native/plugin/Release/ets2ap_plugin.dll `
+            -OutputDirectory ./build/release-assets
+      - name: Smoke-test MSI install and uninstall
+        shell: pwsh
+        run: |
+          $msis = @(Get-ChildItem -LiteralPath ./build/release-assets -Filter '*.msi' -File)
+          if ($msis.Count -ne 1) { throw 'Expected exactly one MSI release asset.' }
+          $msi = $msis[0].FullName
+          $target = Join-Path $env:ProgramFiles 'ETS2 Auto Pilot\ETS2AP.Ui.exe'
+          $install = Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$msi`" /qn /norestart" -Wait -PassThru
+          if ($install.ExitCode -notin @(0, 3010)) { throw "MSI install failed with exit code $($install.ExitCode)." }
+          if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { throw 'Installed app executable was not found.' }
+          $uninstall = Start-Process -FilePath msiexec.exe -ArgumentList "/x `"$msi`" /qn /norestart" -Wait -PassThru
+          if ($uninstall.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed with exit code $($uninstall.ExitCode)." }
+          if (Test-Path -LiteralPath $target) { throw 'App executable remains after uninstall.' }
+      - name: Upload release assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: build/release-assets/ETS2AP_*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [prepare, package]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download package assets
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Download release notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes
+          path: release-notes
       - name: Publish GitHub Release
-        if: steps.v.outputs.publish == 'true'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          tag_name: ${{ steps.v.outputs.tag }}
-          name: ${{ steps.v.outputs.tag }}
-          body_path: ${{ runner.temp }}/release-body.md
-          prerelease: ${{ contains(steps.v.outputs.version, '-') }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.tag }}
+          body_path: release-notes/release-body.md
+          files: release-assets/ETS2AP_*

@@ -1,7 +1,10 @@
 // Edited by: OpenAI-Codex_Responsible: Source_Code
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Net.Http;
+using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -18,6 +21,7 @@ public partial class MainWindow : Window
     private readonly NavigationState _navigation = new();
     private readonly CancellationTokenSource _serviceCancellation = new();
     private UiPipeClient? _service;
+    private bool _installingConnector;
 
     public MainWindow()
     {
@@ -108,15 +112,65 @@ public partial class MainWindow : Window
         UpdateFolderStatus();
     }
 
+    private async void InstallConnector_Click(object sender, RoutedEventArgs e)
+    {
+        string gameFolder = GameFolderText.Text;
+        if (!File.Exists(Path.Combine(gameFolder, "bin", "win_x64", "eurotrucks2.exe")))
+        {
+            InstallStatus.Text = Strings.FolderInvalid;
+            UpdateFolderStatus();
+            return;
+        }
+        if (ConnectorInstaller.IsGameRunning())
+        {
+            InstallStatus.Text = Strings.ConnectorGameMustBeClosed;
+            return;
+        }
+
+        _installingConnector = true;
+        InstallConnectorButton.IsEnabled = false;
+        try
+        {
+            InstallStatus.Text = Strings.ConnectorInstallElevationPrompt;
+            int result = await ConnectorInstaller.LaunchElevatedAsync(gameFolder, _serviceCancellation.Token);
+            InstallStatus.Text = result switch
+            {
+                0 => Strings.ConnectorInstallSuccess,
+                ConnectorInstaller.GameRunningExitCode => Strings.ConnectorGameMustBeClosed,
+                _ => Strings.ConnectorInstallFailed
+            };
+        }
+        catch (Win32Exception error) when (error.NativeErrorCode == 1223)
+        {
+            InstallStatus.Text = Strings.ConnectorInstallCancelled;
+        }
+        catch (OperationCanceledException)
+        {
+            InstallStatus.Text = Strings.ConnectorInstallCancelled;
+        }
+        catch (Exception error) when (error is HttpRequestException or IOException or UnauthorizedAccessException or
+            ArgumentException or CryptographicException or InvalidOperationException or Win32Exception)
+        {
+            InstallStatus.Text = Strings.ConnectorInstallFailed;
+        }
+        finally
+        {
+            _installingConnector = false;
+            UpdateFolderStatus();
+        }
+    }
+
     private void UpdateFolderStatus()
     {
         if (string.IsNullOrWhiteSpace(GameFolderText.Text))
         {
             FolderStatus.Text = Strings.NoFolderSelected;
+            InstallConnectorButton.IsEnabled = false;
             return;
         }
         string executable = Path.Combine(GameFolderText.Text, "bin", "win_x64", "eurotrucks2.exe");
         FolderStatus.Text = File.Exists(executable) ? Strings.FolderAccepted : Strings.FolderInvalid;
+        InstallConnectorButton.IsEnabled = !_installingConnector && File.Exists(executable);
     }
 
     private void ThemePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)

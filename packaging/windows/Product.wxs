@@ -1,0 +1,41 @@
+<!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="ETS2 Auto Pilot"
+           Manufacturer="Kingsley"
+           Version="$(var.AppVersion)"
+           UpgradeCode="aff75188-0501-4fa8-95f7-26e5d019a3ae"
+           Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ETS2 Auto Pilot" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="ETS2 Auto Pilot" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="ETS2 Auto Pilot" Level="1">
+      <Files Include="$(var.PublishDirectory)\**" Directory="INSTALLFOLDER">
+        <Exclude Files="**\*.pdb" />
+      </Files>
+      <Component Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+        <Shortcut Id="ApplicationShortcut"
+                  Name="ETS2 Auto Pilot"
+                  Target="[INSTALLFOLDER]ETS2AP.Ui.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKLM"
+                       Key="Software\Kingsley\ETS2 Auto Pilot"
+                       Name="StartMenuShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </Feature>
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+  </Package>
+</Wix>

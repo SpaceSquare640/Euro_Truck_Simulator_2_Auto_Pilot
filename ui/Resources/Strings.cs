@@ -51,6 +51,11 @@ public static class Strings
     public static string ConnectorInstallationDescription => Get(nameof(ConnectorInstallationDescription));
     public static string InstallConnector => Get(nameof(InstallConnector));
     public static string ConnectorUnavailable => Get(nameof(ConnectorUnavailable));
+    public static string ConnectorInstallElevationPrompt => Get(nameof(ConnectorInstallElevationPrompt));
+    public static string ConnectorInstallSuccess => Get(nameof(ConnectorInstallSuccess));
+    public static string ConnectorInstallFailed => Get(nameof(ConnectorInstallFailed));
+    public static string ConnectorInstallCancelled => Get(nameof(ConnectorInstallCancelled));
+    public static string ConnectorGameMustBeClosed => Get(nameof(ConnectorGameMustBeClosed));
     public static string ServiceUnavailable => Get(nameof(ServiceUnavailable));
     public static string SettingsTitle => Get(nameof(SettingsTitle));
     public static string Appearance => Get(nameof(Appearance));

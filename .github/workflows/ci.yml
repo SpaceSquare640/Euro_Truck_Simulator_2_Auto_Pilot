@@ -29,7 +29,7 @@ jobs:
           python=false
           ui=false
           if [ -f native/CMakeLists.txt ]; then native=true; fi
-          if [ -f python/pyproject.toml ]; then python=true; fi
+          if [ -d python/ets2ap ] && [ -d python/tests ]; then python=true; fi
           for f in ui/*.sln ui/*.slnx; do
             if [ -f "$f" ]; then ui=true; break; fi
           done
@@ -61,10 +61,8 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: python -m pip install --upgrade pip
-      - run: pip install -e ".[dev]"
-      - run: ruff check .
-      - run: pytest
+      - run: python -m compileall -q ets2ap tests
+      - run: python -m unittest discover -s tests -v
 
   ui:
     needs: detect
