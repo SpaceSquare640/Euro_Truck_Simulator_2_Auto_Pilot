@@ -45,13 +45,25 @@ All notable changes to this project are documented here and published on the pro
 
 ## [Unreleased]
 
+### Changed
+- The application source code and software use the PolyForm Noncommercial License 1.0.0; website content remains CC BY-NC-SA 4.0 and website source code uses PolyForm Noncommercial License 1.0.0. The connector ZIP carries the SCS SDK MIT notice. (OpenAI-Codex_Responsible: Source_Code)
+
+## [0.0.3] - 2026-10-25
+
 ### Added
+- The WPF app starts the bundled Python UI status service from the installed runtime, terminates it on app exit, and allows one automatic restart after an unexpected process exit. The MSI now includes the Python modules and validates their embedded-runtime import and install paths; Control.v1 engagement remains unavailable. (OpenAI-Codex_Responsible: Source_Code)
 - The production SCS plugin now registers a semantic steering/forward/brake input device without requiring player-side axis binding; native output starts neutral and fails closed on invalid, disengaged, or stale commands. ETS2 profile mix support remains **[VERIFY]**. (OpenAI-Codex_Responsible: Source_Code)
-- Added a native Control.v1 core for packet validation, status encoding, 100 ms watchdog expiry logic, neutral re-arm, manual-override latching, safety gates, brake priority, and slew limits. The host must schedule `Tick` independently of pipe I/O; braking cuts applied throttle immediately, throttle stays zero until applied brake returns to zero, and a reduced steering cap immediately bounds output. Named Pipe transport and game-control integration remain unavailable. (OpenAI-Codex_Responsible: Source_Code)
-- Added a native plugin host that runs the Control.v1 watchdog every 10 ms independently of command input, publishes only engaged snapshots to the SCS semantic input device, and keeps every non-engaged state neutral. Named Pipe transport, Python commands, and the production manual-input detector remain unconnected. (OpenAI-Codex_Responsible: Source_Code)
+- Added a native Control.v1 core for packet validation, status encoding, 100 ms watchdog expiry logic, neutral re-arm, manual-override latching, safety gates, brake priority, and slew limits. The host must schedule `Tick` independently of pipe I/O; braking cuts applied throttle immediately, throttle stays zero until applied brake returns to zero, and a reduced steering cap immediately bounds output. Command packet transport is implemented, but end-to-end engagement and game-control integration remain unavailable. (OpenAI-Codex_Responsible: Source_Code)
+- Added a native plugin host that runs the Control.v1 watchdog every 10 ms independently of command input, publishes only engaged snapshots to the SCS semantic input device, and keeps every non-engaged state neutral. The production manual-input detector remains unconnected. (OpenAI-Codex_Responsible: Source_Code)
+- Added the native Control.v1 named-pipe server and Python client: current-user DACL, remote-client rejection, canonical peer image and SID validation, overlapped transport, separate command/status I/O, neutral reconnect handshake, strict status validation, and a 100 ms status-frame deadline. Engage remains denied until independent telemetry, speed-limit, UI-authorization, and physical-input safety gates are wired. (OpenAI-Codex_Responsible: Source_Code)
+- Bundled the pinned CPython 3.13.17 x64 embeddable runtime and its license in the MSI, and registered the per-machine install root used by the native Control.v1 peer check. The WPF app launches the status-only Python service; the Control.v1 client is not connected to the UI authorization or safety-gate workflow. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
-- Documented that the semantic input path is not yet connected to a production control pipe or Python controller, so automatic driving remains unavailable. (OpenAI-Codex_Responsible: Source_Code)
+- Licensed the application source code and software under PolyForm Noncommercial License 1.0.0. The MSI includes the full license and NOTICE; the connector manifest identifies the license and copyright, and the ZIP carries the SCS SDK MIT notice. Previous release tags retain their existing license files. (OpenAI-Codex_Responsible: Source_Code)
+- Formatted the MSI license agreement as plain text and reserved Control.v1 command sequence numbers before writing to prevent acknowledgements from racing ahead of the sender state. (OpenAI-Codex_Responsible: Source_Code)
+- Updated native and Python documentation to describe the new Control.v1 transport, bundled runtime path, and remaining service-launch and safety-gate limitations. (OpenAI-Codex_Responsible: Source_Code)
+- Release packaging uses a version-specific WiX intermediate directory so stale MSI build state cannot suppress output for a new version. (OpenAI-Codex_Responsible: Source_Code)
+- This release is an installation and telemetry integration preview. Automatic driving remains disabled until the production safety gates and Python Control.v1 client are connected; semantic input mix support still requires in-game verification. (OpenAI-Codex_Responsible: Source_Code)
 
 ## [0.0.2] - 2026-10-25
 
