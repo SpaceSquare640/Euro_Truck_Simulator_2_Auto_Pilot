@@ -5,6 +5,8 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- Windows x64 release packaging for the WPF app and native connector, with equivalent setup EXE/MSI choices, a versioned connector ZIP, and CI install/uninstall smoke test. (OpenAI-Codex_Responsible: Source_Code)
+- Setup can download the published connector ZIP from GitHub, verify the release and DLL digests, and install supported DLLs into the selected ETS2 plugins folder with an elevation prompt and backups. (OpenAI-Codex_Responsible: Source_Code)
 - One-command Phase 0 in-game steering probe with continuous parked-state checks for simple automatic transmission, signed pulse verification, neutral-output acknowledgement, and offline self-test. (OpenAI-Codex_Responsible: Source_Code)
 - Phase 0 probe accepts an explicit output directory and uses fresh telemetry rather than process enumeration to validate game/plugin activity. (OpenAI-Codex_Responsible: Source_Code)
 - Development Python UI status service and WPF named-pipe status display with bounded framing, peer-image checks, and offline protocol checks; engagement remains disabled until native control integration. (OpenAI-Codex_Responsible: Source_Code)
@@ -21,6 +23,8 @@ All notable changes to this project are documented here and published on the pro
 - Native telemetry writer: `telemetry_core` library (layout, conversions, validity groups, moving_backward hysteresis, seqlock, Windows shared-memory owner), the SCS SDK plugin glue exporting `scs_telemetry_init` and `scs_telemetry_shutdown`, a minimal in-repo test framework, and writer-to-reader round-trip tests. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
+- Connector installation locks the selected local directory chain, rejects reparse points, verifies persistent backups, and restores through a fresh temporary file. (OpenAI-Codex_Responsible: Source_Code)
+- Enabled Python CI for the existing package and tests without installing unused development dependencies. (OpenAI-Codex_Responsible: Source_Code)
 - Hardened the Phase 0 Spike by retaining semantic input descriptors for the device lifetime and logging CSV write failures before disabling the affected stream. (OpenAI-Codex_Responsible: Source_Code)
 - Changed the Phase 0 Spike default to the SCS semantical input device, which maps configured game mixes without a player binding UI; mix support still requires verification per ETS2 profile. (OpenAI-Codex_Responsible: Source_Code)
 - Restored the generic `ETS2AP Spike` device alongside the no-bind semantic device by default, so existing ETS2 profiles recognize the assigned device while semantic input remains available. (OpenAI-Codex_Responsible: Source_Code)
