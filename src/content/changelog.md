@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here and published on the project website.
 
-## [Unreleased]
+## [0.0.1] - 2026-10-25
 
 ### Added
 - Windows x64 release packaging for the WPF app and native connector, with a versioned connector ZIP, an MSI installer, and a CI install/uninstall smoke test. (OpenAI-Codex_Responsible: Source_Code)
@@ -42,5 +42,7 @@ All notable changes to this project are documented here and published on the pro
 - Release and Sync Docs workflows use least-privilege permissions; Change Log.md is validated before it is synced to the website; releases are restricted to tags on Source_Code; `generate_release_notes` is no longer used. (OpenAI-Codex_Responsible: Source_Code)
 - CI module detection no longer uses `ls | grep` and writes its outputs in one block, which fixes the Actionlint shellcheck findings. (OpenAI-Codex_Responsible: Source_Code)
 - Release packages are now the connector ZIP and the MSI installer; the additional installer wrapper was removed because its failures could not be diagnosed. (OpenAI-Codex_Responsible: Source_Code)
+
+## [Unreleased]
 
 <!-- Edited by: OpenAI-Codex_Responsible: Source_Code -->
