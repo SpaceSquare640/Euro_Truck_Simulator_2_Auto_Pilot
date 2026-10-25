@@ -81,7 +81,7 @@ foreach ($character in $licenseText.ToCharArray()) {
     elseif ($code -lt 128) { [void]$escapedLicense.Append($character) }
     else {
         $signedCode = if ($code -gt 32767) { $code - 65536 } else { $code }
-        [void]$escapedLicense.Append("\u$signedCode?")
+        [void]$escapedLicense.Append("\u$($signedCode)?")
     }
 }
 $licenseRtfPath = Join-Path $outputRoot 'license.rtf'
