@@ -14,6 +14,7 @@ All notable changes to this project are documented here and published on the pro
 - Added Control.v1.1 safety-claim packets and server capability negotiation; the client will not engage with a legacy server, and native engagement stays blocked while its local input-monitor gate is unavailable. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
+- Updated the Control.v1 cross-process smoke client to send required v1.1 safety claims so the native test exercises server-side fail-closed gates. (OpenAI-Codex_Responsible: Source_Code)
 - Decoupled the neutral Control.v1 heartbeat from status reads and capped it at a 50 ms interval to prevent status updates from driving command traffic. (OpenAI-Codex_Responsible: Source_Code)
 - Native UI authorization now fails closed; WPF input-monitor health remains unavailable until physical-device coverage is validated. Corrected Raw Input mouse-button release tracking. (OpenAI-Codex_Responsible: Source_Code)
 - Documented the current fixed 0.30 steering cap and marked speed-dependent steering calibration as unfinished. (OpenAI-Codex_Responsible: Source_Code)
