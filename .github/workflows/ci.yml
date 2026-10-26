@@ -53,8 +53,9 @@ jobs:
       - name: Run native tests with the Control.v1 Python smoke client
         shell: pwsh
         run: |
-          $env:ETS2AP_TEST_PYTHON = (Get-Command python -CommandType Application -ErrorAction Stop).Source
-          if (-not (Test-Path -LiteralPath $env:ETS2AP_TEST_PYTHON -PathType Leaf)) { throw 'Python smoke client executable was not found.' }
+          $pythonPath = (python -c "import sys; print(sys.executable)").Trim()
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($pythonPath) -or -not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) { throw 'Python smoke client executable was not found.' }
+          $env:ETS2AP_TEST_PYTHON = $pythonPath
           ctest --test-dir build/native -C Release --output-on-failure
 
   python:
