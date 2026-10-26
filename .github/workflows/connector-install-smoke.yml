@@ -1,0 +1,33 @@
+# Edited by: OpenAI-Codex_Responsible: Source_Code
+name: Connector Install Smoke
+
+on:
+  push:
+    branches: [Source_Code]
+    paths:
+      - "ui/ConnectorInstaller.cs"
+      - "ui/ConnectorPackage.cs"
+      - "ui/checks/**"
+      - "ui/Properties/AssemblyInfo.cs"
+      - "ui/ETS2AP.UI.csproj"
+      - ".github/workflows/connector-install-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connector-install-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  connector-install:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.x"
+      - name: Test connector install, backup, and rollback
+        run: dotnet run --project ui/checks/ETS2AP.UI.Checks.csproj --configuration Release -- --connector-install-smoke

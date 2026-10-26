@@ -67,7 +67,15 @@ internal static class ConnectorInstaller
     {
         if (!IsAdministrator()) throw new UnauthorizedAccessException("Administrator permission is required.");
         if (IsGameRunning()) throw new GameIsRunningException();
+        InstallPackageCore(gameFolder, package, IsGameRunning);
+    }
 
+    internal static void InstallPackageForChecks(string gameFolder, DownloadedConnectorPackage package,
+        Func<bool> isGameRunning) => InstallPackageCore(gameFolder, package, isGameRunning);
+
+    private static void InstallPackageCore(string gameFolder, DownloadedConnectorPackage package,
+        Func<bool> isGameRunning)
+    {
         string gameRoot = Path.GetFullPath(gameFolder);
         if (package.Sha256.Length != 64 || package.Sha256.Any(character => !Uri.IsHexDigit(character)))
             throw new InvalidDataException("Connector ZIP digest is invalid.");
@@ -139,7 +147,7 @@ internal static class ConnectorInstaller
             {
                 foreach (InstallItem item in installItems)
                 {
-                    if (IsGameRunning()) throw new GameIsRunningException();
+                    if (isGameRunning()) throw new GameIsRunningException();
                     File.Move(item.TemporaryPath, item.TargetPath, overwrite: true);
                     installed.Add(item);
                 }

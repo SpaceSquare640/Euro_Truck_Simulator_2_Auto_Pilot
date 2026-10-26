@@ -26,6 +26,22 @@ internal static class Program
     {
         if (args.Length == 2 && args[0] == "--ipc-smoke")
             return CheckPipeSmoke(args[1]);
+        if (args.Length == 1 && args[0] == "--connector-install-smoke")
+        {
+            try
+            {
+                CheckConnectorInstallTransaction();
+                Console.WriteLine("PASS Connector install transaction");
+                Console.WriteLine("Connector install smoke: 1 passed, 0 failed");
+                return 0;
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine($"FAIL Connector install transaction: {error.Message}");
+                Console.WriteLine("Connector install smoke: 0 passed, 1 failed");
+                return 1;
+            }
+        }
         (string Name, Action Run)[] checks =
         [
             ("Localized resources", CheckResources),
@@ -42,6 +58,7 @@ internal static class Program
             ("Connector release download", CheckConnectorReleaseDownload),
             ("Connector archive validation", CheckConnectorArchiveValidation),
             ("Connector install directory lock", CheckConnectorInstallDirectoryLock),
+            ("Connector install transaction", CheckConnectorInstallTransaction),
             ("QPC clock origin", CheckQpcClock)
         ];
 
@@ -431,6 +448,90 @@ internal static class Program
         }
     }
 
+    private static void CheckConnectorInstallTransaction()
+    {
+        MethodInfo? installMethod = typeof(ConnectorInstaller).GetMethod(
+            "InstallPackageForChecks", BindingFlags.Static | BindingFlags.NonPublic);
+        if (installMethod is null)
+            throw new InvalidOperationException("Connector installer has no isolated package-install path for fixture checks.");
+
+        string parent = Path.Combine(Environment.CurrentDirectory, "build");
+        Directory.CreateDirectory(parent);
+        string gameRoot = Path.Combine(parent, $"ets2ap-install-{Guid.NewGuid():N}");
+        string win64 = Path.Combine(gameRoot, "bin", "win_x64");
+        string pluginDirectory = Path.Combine(win64, "plugins");
+
+        byte[] originalPlugin = [0x4d, 0x5a, 0x01];
+        byte[] originalInput = [0x4d, 0x5a, 0x02];
+        byte[] firstPlugin = [0x4d, 0x5a, 0x11];
+        byte[] firstInput = [0x4d, 0x5a, 0x12];
+        string pluginPath = Path.Combine(pluginDirectory, "ets2ap_plugin.dll");
+        string inputPath = Path.Combine(pluginDirectory, "ets2ap_input.dll");
+
+        try
+        {
+            Directory.CreateDirectory(pluginDirectory);
+            File.WriteAllBytes(Path.Combine(win64, "eurotrucks2.exe"), [0x4d, 0x5a]);
+            File.WriteAllBytes(pluginPath, originalPlugin);
+            File.WriteAllBytes(inputPath, originalInput);
+
+            byte[] firstArchive = BuildConnectorArchive("1.2.3",
+                dllContent: firstPlugin, inputDllContent: firstInput);
+            var firstPackage = new DownloadedConnectorPackage("1.2.3",
+                Convert.ToHexString(SHA256.HashData(firstArchive)).ToLowerInvariant(), firstArchive);
+            InvokeConnectorInstallForChecks(installMethod, gameRoot, firstPackage, static () => false);
+
+            Require(File.ReadAllBytes(pluginPath).SequenceEqual(firstPlugin),
+                "The main connector DLL was not installed into the fixture game folder.");
+            Require(File.ReadAllBytes(inputPath).SequenceEqual(firstInput),
+                "The input connector DLL was not installed into the fixture game folder.");
+
+            string backupRoot = Directory.EnumerateDirectories(win64, "ETS2AP_Backups_*").Single();
+            Require(File.ReadAllBytes(Path.Combine(backupRoot, "ets2ap_plugin.dll")).SequenceEqual(originalPlugin),
+                "The previous plugin DLL was not backed up intact.");
+            Require(File.ReadAllBytes(Path.Combine(backupRoot, "ets2ap_input.dll")).SequenceEqual(originalInput),
+                "The previous input DLL was not backed up intact.");
+
+            InvokeConnectorInstallForChecks(installMethod, gameRoot, firstPackage, static () => false);
+            Require(Directory.EnumerateDirectories(win64, "ETS2AP_Backups_*").Count() == 1,
+                "Reinstalling identical DLLs created an unnecessary backup.");
+
+            byte[] updatedPlugin = [0x4d, 0x5a, 0x21];
+            byte[] updatedInput = [0x4d, 0x5a, 0x22];
+            byte[] updateArchive = BuildConnectorArchive("1.2.4",
+                dllContent: updatedPlugin, inputDllContent: updatedInput);
+            var updatePackage = new DownloadedConnectorPackage("1.2.4",
+                Convert.ToHexString(SHA256.HashData(updateArchive)).ToLowerInvariant(), updateArchive);
+            int gameRunningChecks = 0;
+            bool interrupted = false;
+            try
+            {
+                InvokeConnectorInstallForChecks(installMethod, gameRoot, updatePackage,
+                    () => ++gameRunningChecks == 2);
+            }
+            catch (TargetInvocationException error) when (error.InnerException is not null)
+            {
+                interrupted = true;
+            }
+
+            Require(interrupted && gameRunningChecks == 2,
+                "The install did not stop when the game became active during a multi-DLL update.");
+            Require(File.ReadAllBytes(pluginPath).SequenceEqual(firstPlugin) &&
+                File.ReadAllBytes(inputPath).SequenceEqual(firstInput),
+                "A failed multi-DLL update did not restore the previously installed connector files.");
+            Require(!Directory.EnumerateFiles(pluginDirectory, "*.tmp").Any(),
+                "A failed connector update left temporary files behind.");
+        }
+        finally
+        {
+            if (Directory.Exists(gameRoot)) Directory.Delete(gameRoot, recursive: true);
+        }
+    }
+
+    private static void InvokeConnectorInstallForChecks(MethodInfo installMethod, string gameRoot,
+        DownloadedConnectorPackage package, Func<bool> isGameRunning) =>
+        installMethod.Invoke(null, [gameRoot, package, isGameRunning]);
+
     private static bool RejectRelease(string json)
     {
         try
@@ -456,6 +557,7 @@ internal static class Program
         string name = "ets2ap_plugin.dll",
         string entryPath = "plugins/ets2ap_plugin.dll",
         byte[]? dllContent = null,
+        byte[]? inputDllContent = null,
         string? declaredHash = null,
         bool includeSdkLicense = false,
         bool tamperSdkLicense = false)
@@ -466,8 +568,16 @@ internal static class Program
         {
             ["format"] = 1,
             ["version"] = version,
-            ["files"] = new[] { new { name, sha256 = hash } }
+            ["files"] = new List<object> { new { name, sha256 = hash } }
         };
+        if (inputDllContent is not null)
+        {
+            ((List<object>)manifestFields["files"]).Add(new
+            {
+                name = "ets2ap_input.dll",
+                sha256 = Convert.ToHexString(SHA256.HashData(inputDllContent)).ToLowerInvariant()
+            });
+        }
         byte[]? sdkLicenseBytes = null;
         byte[]? sdkLicenseArchiveBytes = null;
         if (includeSdkLicense)
@@ -490,6 +600,11 @@ internal static class Program
                 writer.Write(manifest);
             using (var dll = zip.CreateEntry(entryPath).Open())
                 dll.Write(dllContent);
+            if (inputDllContent is not null)
+            {
+                using var inputDll = zip.CreateEntry("plugins/ets2ap_input.dll").Open();
+                inputDll.Write(inputDllContent);
+            }
             if (sdkLicenseArchiveBytes is not null)
             {
                 using var license = zip.CreateEntry("licenses/scs-sdk-mit.txt").Open();

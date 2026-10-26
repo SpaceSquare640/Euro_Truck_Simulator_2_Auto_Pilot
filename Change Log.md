@@ -5,6 +5,7 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- Added a Windows GitHub Actions smoke test for connector installation, backup, idempotence, and rollback in a synthetic ETS2 folder. (OpenAI-Codex_Responsible: Source_Code)
 - UI IPC v1.2 Control.v1 connection and native state diagnostics in the Overview; v1.0 and v1.1 remain supported, and engagement stays disabled. (OpenAI-Codex_Responsible: Source_Code)
 - Connected the Python service to DriverAssistRuntime and the native Control.v1 status pipe when a saved ETS2 executable path is available; engagement remains denied and only neutral/disengaged commands are sent. (OpenAI-Codex_Responsible: Source_Code)
 - UI IPC v1.1 perception summary and an Overview readiness panel for frame capture, focus, input monitoring, lane confidence, and front-obstacle status. (OpenAI-Codex_Responsible: Source_Code)
