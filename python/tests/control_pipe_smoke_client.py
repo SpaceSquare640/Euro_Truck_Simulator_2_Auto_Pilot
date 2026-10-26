@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ets2ap.control_client import ControlClient
-from ets2ap.control_protocol import ControlState
+from ets2ap.control_protocol import ControlState, REQUIRED_ENGAGE_FLAGS
 
 
 def main() -> None:
@@ -31,7 +31,8 @@ def main() -> None:
         if status.last_accepted_sequence != 1 or status.state is not ControlState.DISENGAGED:
             raise AssertionError("native server did not accept the neutral handshake")
 
-        client.send_command(0.5, 0.0, 0.0, True)
+        client.send_command(0.5, 0.0, 0.0, True,
+                            safety_flags=REQUIRED_ENGAGE_FLAGS)
         deadline = time.monotonic() + 0.5
         status = client.read_status()
         while status.last_accepted_sequence < 2 and time.monotonic() < deadline:
