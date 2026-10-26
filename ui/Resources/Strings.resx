@@ -25,6 +25,21 @@
   <data name="Game" xml:space="preserve"><value>Game</value></data>
   <data name="Connector" xml:space="preserve"><value>Connector</value></data>
   <data name="ControlService" xml:space="preserve"><value>Control service</value></data>
+  <data name="ControlLinkNotConfigured" xml:space="preserve"><value>Game executable is not configured.</value></data>
+  <data name="ControlLinkDisconnected" xml:space="preserve"><value>Native control channel is disconnected.</value></data>
+  <data name="ControlLinkConnectedStateFormat" xml:space="preserve"><value>Native channel connected; game input reports {0}.</value></data>
+  <data name="ControlLinkConnectedStateReasonFormat" xml:space="preserve"><value>Native channel connected; game input reports {0} ({1}).</value></data>
+  <data name="NativeControlDisengaged" xml:space="preserve"><value>disengaged</value></data>
+  <data name="NativeControlEngaged" xml:space="preserve"><value>engaged</value></data>
+  <data name="NativeControlManualOverride" xml:space="preserve"><value>manual override latched</value></data>
+  <data name="NativeControlTimeout" xml:space="preserve"><value>timed out</value></data>
+  <data name="NativeControlRejected" xml:space="preserve"><value>rejected</value></data>
+  <data name="NativeReasonManualInput" xml:space="preserve"><value>manual input</value></data>
+  <data name="NativeReasonCommandTimeout" xml:space="preserve"><value>command timeout</value></data>
+  <data name="NativeReasonMalformedPacket" xml:space="preserve"><value>malformed packet</value></data>
+  <data name="NativeReasonVersionMismatch" xml:space="preserve"><value>protocol version mismatch</value></data>
+  <data name="NativeReasonClientDisconnected" xml:space="preserve"><value>client disconnected</value></data>
+  <data name="NativeReasonTelemetryUnavailable" xml:space="preserve"><value>telemetry unavailable</value></data>
   <data name="Pending" xml:space="preserve"><value>Pending</value></data>
   <data name="Engage" xml:space="preserve"><value>Engage auto pilot</value></data>
   <data name="EngageUnavailable" xml:space="preserve"><value>Automatic driving remains disabled until physical-input monitoring and road perception are validated.</value></data>

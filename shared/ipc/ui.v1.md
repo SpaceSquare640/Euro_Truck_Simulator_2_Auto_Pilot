@@ -1,6 +1,6 @@
 # UI IPC v1
 
-Status: v1.1 draft, compatible with v1.0. Python creates \\.\pipe\ETS2AP_UI_v1 as a single-client Windows byte-stream pipe; the WPF UI connects as client. Both directions use the same framing and [draft 2020-12 JSON Schema](ui.v1.schema.json). The UI requests actions and presents localized status; Python owns the control state. Pipe creation, current-user DACL, remote-client rejection, and peer-image verification follow [control pipe access](control.v1.md#pipe-access-and-peer-identity). Python accepts only the configured UI executable's canonical full path and current-user SID, and rejects a second concurrent connection. The UI verifies the configured Python server executable and SID. Any unverifiable identity closes the connection.
+Status: v1.2 draft, compatible with v1.1 and v1.0. Python creates \\.\pipe\ETS2AP_UI_v1 as a single-client Windows byte-stream pipe; the WPF UI connects as client. Both directions use the same framing and [draft 2020-12 JSON Schema](ui.v1.schema.json). The UI requests actions and presents localized status; Python owns the control state. Pipe creation, current-user DACL, remote-client rejection, and peer-image verification follow [control pipe access](control.v1.md#pipe-access-and-peer-identity). Python accepts only the configured UI executable's canonical full path and current-user SID, and rejects a second concurrent connection. The UI verifies the configured Python server executable and SID. Any unverifiable identity closes the connection.
 
 ## Frame and envelope
 
@@ -13,7 +13,7 @@ Every message has:
 | Member | Type | Meaning |
 |---|---|---|
 | type | string | Message type; the envelope permits unknown types so application dispatch can handle them |
-| version | string | major.minor; v1.0 is the original status shape and v1.1 adds an optional perception summary; accept compatible 1.x and ignore unknown optional members |
+| version | string | major.minor; v1.0 is the original status shape, v1.1 adds an optional perception summary, and v1.2 adds an optional native Control.v1 summary; accept compatible 1.x and ignore unknown optional members |
 | id | string | 1–64 ASCII letters, digits, dots, underscores, or hyphens; UI requests start with u-, Python-initiated events start with p-; unique for each new request/event within one connection |
 | timestamp | string | Base-10 uint64 QPC nanoseconds, with no sign or leading zero; same-boot monotonic time, never a wall-clock date |
 | payload | object | Type-specific data; empty object for a message without fields |
@@ -22,7 +22,7 @@ A response uses the request's id, including its u- prefix; Python-initiated stat
 
 ## Handshake and flow
 
-1. On connection, the UI sends hello as its first frame with supported_versions containing 1.1 and 1.0, in preference order. Python replies with hello_ack, choosing the highest supported shared version. If no major version is shared, Python sends error with UNSUPPORTED_VERSION if the envelope can be decoded, then closes.
+1. On connection, the UI sends hello as its first frame with supported_versions containing 1.2, 1.1, and 1.0, in preference order. Python replies with hello_ack, choosing the highest supported shared version. If no major version is shared, Python sends error with UNSUPPORTED_VERSION if the envelope can be decoded, then closes.
 2. Python sends a config snapshot and status after hello_ack. The UI may request another status with get_status. Python also sends status whenever the state or summarized telemetry changes; it may coalesce high-frequency telemetry.
 3. UI set_config requests an update. Python validates it and returns config with the same id containing the applied snapshot, or error with the same id. An engage request includes the `state_revision` from the latest status observed by the UI. Python evaluates the revision match, state freshness, and all control safety gates in one atomic decision. State evidence must be no older than 500 ms **[TUNE]**; stricter telemetry and native-status freshness rules still apply. A mismatch or stale state returns STALE_STATUS; a failed safety gate returns its corresponding error. UI engage/disengage requests receive status with the same id on acceptance or error on rejection. A UI request never directly controls native/input.
 4. On pipe disconnection, the UI marks state offline and reconnects. Python's safety behavior follows [control v1](control.v1.md); a reconnect starts a new hello and does not imply re-engagement. The UI must wait for fresh status before presenting an engaged state.
@@ -37,14 +37,16 @@ A response uses the request's id, including its u- prefix; Python-initiated stat
 | UI → Python | engage | state_revision: latest observed nonnegative revision | status or error with matching id |
 | UI → Python | disengage | empty object | status with matching id |
 | Python → UI | hello_ack | selected_version: major.minor string | Completes handshake |
-| Python → UI | status | state, error_code, state_revision, telemetry; optional perception in v1.1 | Current state, telemetry, and safety observations |
+| Python → UI | status | state, error_code, state_revision, telemetry; optional perception in v1.1+ and control in v1.2+ | Current state, telemetry, and safety observations |
 | Python → UI | config | config: object with target_speed_mps | Applied configuration |
 | Python → UI | log | level, message_key, args | Localized diagnostic event |
 | Python → UI | error | code | Rejected request or asynchronous error |
 
 Python status.state is one of ready, engaged, manual_override, or fault. `offline` is local UI state after pipe loss and SHALL NOT be sent in a Python status message. status.error_code is null when there is no active error, otherwise one of the codes below. status.state_revision is a nonnegative integer, starting at zero for a Python process and incrementing only when state or error_code changes; a telemetry-summary-only update keeps the same revision. telemetry contains speed_mps, speed_limit_mps, navigation_distance_m, and telemetry_age_s. The first three are nonnegative numbers or null when their corresponding validity bit is clear. telemetry_age_s is the age in seconds of the latest valid telemetry snapshot, or null if no valid snapshot has ever been received. The summary is informational and never overrides control safety checks.
 
-In v1.1, status may include a `perception` object with frame_valid, frame_age_s, game_focused, input_monitor_healthy, manual_input_active, lane_confidence, and front_clear. The booleans report WPF observations; age is nonnegative seconds or null; lane_confidence is in [0,1] or null; front_clear is true, false, or null. `input_monitor_healthy` must remain false until physical-device coverage is validated; Raw Input/XInput API availability alone is insufficient. `front_clear: null` means the obstacle detector is not validated. These fields are diagnostics only and never authorize engagement. v1.0 peers omit the perception member.
+In v1.1 and later, status may include a `perception` object with frame_valid, frame_age_s, game_focused, input_monitor_healthy, manual_input_active, lane_confidence, and front_clear. The booleans report WPF observations; age is nonnegative seconds or null; lane_confidence is in [0,1] or null; front_clear is true, false, or null. `input_monitor_healthy` must remain false until physical-device coverage is validated; Raw Input/XInput API availability alone is insufficient. `front_clear: null` means the obstacle detector is not validated. These fields are diagnostics only and never authorize engagement. v1.0 peers omit the perception member.
+
+v1.2 and later status may include a `control` object containing `connection`, `state`, and `reason`. `connection` is `not_configured` when no trusted ETS2 executable path is available, `disconnected` when no fresh native status is available, or `connected` when a fresh Control.v1 status was received. Connected objects include the native state (`disengaged`, `engaged`, `manual_override_latched`, `timeout`, or `rejected`) and reason (`none`, `manual_input`, `command_timeout`, `malformed_packet`, `version_mismatch`, `client_disconnected`, or `telemetry_unavailable`). Non-connected objects set state and reason to null. This is a diagnostic snapshot only: the UI labels it as native-reported state, it does not imply app authorization, and it never enables engagement. Control output values are not sent to the UI. v1.0 and v1.1 peers omit the control member.
 
 ## State and error mapping
 

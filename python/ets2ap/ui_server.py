@@ -11,14 +11,17 @@ import msvcrt
 import os
 import struct
 import sys
+import threading
 import time
 from ctypes import wintypes
 
+from .control_client import ControlClient, ControlClientError, MAX_STATUS_AGE_NS
+from .control_protocol import ControlReason, ControlState, SafetyFlags, ControlStatus
+from .driver_runtime import DriverAssistRuntime
 from .telemetry import TelemetryReader, TelemetrySummary
-from .lane_perception import detect_lane
 from .perception_protocol import MAX_FRAME_AGE_NS, PerceptionFrame
 from .perception import PerceptionReader
-from .ui_protocol import MAX_FRAME, frame, message, parse
+from .ui_protocol import MAX_FRAME, SUPPORTED_VERSIONS, frame, message, parse
 
 PIPE_NAME = r"\\.\pipe\ETS2AP_UI_v1"
 ERROR_IO_PENDING = 997
@@ -35,6 +38,7 @@ PIPE_WAIT = 0
 PIPE_REJECT_REMOTE_CLIENTS = 0x00000008
 TOKEN_QUERY = 0x0008
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+CONTROL_NEUTRAL_HEARTBEAT_INTERVAL_S = 0.05
 
 
 class OVERLAPPED(ctypes.Structure):
@@ -263,14 +267,111 @@ class WinPipe:
         self.kernel.CloseHandle(self.handle)
 
 
-def perception_payload(frame: PerceptionFrame | None, now_ns: int) -> dict:
+class ControlSession:
+    """Observe the trusted native peer and keep its input explicitly neutral."""
+
+    def __init__(self, trusted_server_image: str) -> None:
+        self._trusted_server_image = trusted_server_image
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self._client: ControlClient | None = None
+        self._status: ControlStatus | None = None
+        self._thread: threading.Thread | None = None
+
+    @property
+    def status(self) -> ControlStatus | None:
+        with self._lock:
+            return self._status
+
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self._run, name="ETS2AP-Control-Status", daemon=True)
+        self._thread.start()
+
+    def disengage(self, safety_flags: SafetyFlags | int = 0) -> None:
+        with self._lock:
+            client = self._client
+        if client is None:
+            return
+        try:
+            client.send_command(0.0, 0.0, 0.0, False, safety_flags=safety_flags)
+        except ControlClientError:
+            pass
+
+    def close(self) -> None:
+        self._stop.set()
+        self.disengage()
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout=1.0)
+        with self._lock:
+            client = self._client
+            self._client = None
+            self._status = None
+        if client is not None:
+            client.close()
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            client: ControlClient | None = None
+            heartbeat_stop: threading.Event | None = None
+            heartbeat_thread: threading.Thread | None = None
+            try:
+                client = ControlClient(
+                    self._trusted_server_image,
+                    authorize_engage=lambda: False,
+                )
+                client.connect(timeout_ms=250)
+                with self._lock:
+                    self._client = client
+                    self._status = None
+                heartbeat_stop = threading.Event()
+                heartbeat_thread = threading.Thread(
+                    target=self._send_neutral_heartbeats,
+                    args=(client, heartbeat_stop),
+                    name="ETS2AP-Control-Neutral-Heartbeat",
+                    daemon=True,
+                )
+                heartbeat_thread.start()
+                while not self._stop.is_set():
+                    status = client.read_status()
+                    with self._lock:
+                        self._status = status
+            except (ControlClientError, OSError, ValueError):
+                pass
+            finally:
+                if heartbeat_stop is not None:
+                    heartbeat_stop.set()
+                if heartbeat_thread is not None:
+                    heartbeat_thread.join(timeout=1.0)
+                with self._lock:
+                    if self._client is client:
+                        self._client = None
+                    self._status = None
+                if client is not None:
+                    client.close()
+            self._stop.wait(0.5)
+
+    def _send_neutral_heartbeats(self, client: ControlClient,
+                                 stop: threading.Event) -> None:
+        while not self._stop.is_set() and not stop.wait(CONTROL_NEUTRAL_HEARTBEAT_INTERVAL_S):
+            try:
+                # Keep the 100 ms native watchdog alive independently of status updates.
+                client.send_command(0.0, 0.0, 0.0, False)
+            except (ControlClientError, OSError, ValueError):
+                return
+
+
+def perception_payload(frame: PerceptionFrame | None, now_ns: int,
+                       lane_confidence: float | None = None,
+                       front_clear: bool | None = None) -> dict:
     age_ns = None if frame is None or frame.timestamp_ns > now_ns else now_ns - frame.timestamp_ns
     age_s = age_ns / 1_000_000_000 if age_ns is not None else None
     fresh = age_ns is not None and age_ns <= MAX_FRAME_AGE_NS
     valid = bool(frame and frame.frame_valid and fresh)
-    lane_confidence = None
-    if valid and frame is not None:
-        lane_confidence = detect_lane(frame.rgb, width=160, height=90).confidence
+    if not valid:
+        lane_confidence = None
     return {
         "frame_valid": valid,
         "frame_age_s": age_s,
@@ -278,12 +379,27 @@ def perception_payload(frame: PerceptionFrame | None, now_ns: int) -> dict:
         "input_monitor_healthy": bool(frame and frame.input_monitor_healthy),
         "manual_input_active": bool(frame and frame.manual_input_active),
         "lane_confidence": lane_confidence,
-        "front_clear": None,
+        "front_clear": front_clear,
+    }
+
+
+def control_payload(status: ControlStatus | None, *, configured: bool, now_ns: int) -> dict:
+    if not configured:
+        return {"connection": "not_configured", "state": None, "reason": None}
+    if (status is None or not isinstance(status.state, ControlState) or
+            not isinstance(status.reason, ControlReason) or
+            status.timestamp_ns > now_ns or now_ns - status.timestamp_ns > MAX_STATUS_AGE_NS):
+        return {"connection": "disconnected", "state": None, "reason": None}
+    return {
+        "connection": "connected",
+        "state": status.state.name.lower(),
+        "reason": status.reason.name.lower(),
     }
 
 
 def status_payload(summary: TelemetrySummary | None, revision: int,
-                   perception: dict | None = None) -> dict:
+                   perception: dict | None = None,
+                   control: dict | None = None) -> dict:
     if summary is None or summary.speed_mps is None or summary.paused is None:
         error = "TELEMETRY_UNAVAILABLE"
     elif summary.telemetry_age_s is None or summary.telemetry_age_s > 0.25:
@@ -297,13 +413,20 @@ def status_payload(summary: TelemetrySummary | None, revision: int,
                           "telemetry_age_s": summary.telemetry_age_s if summary else None}}
     if perception is not None:
         payload["perception"] = perception
+    if control is not None:
+        payload["control"] = control
     return payload
 
 
-def serve(trusted_ui_image: str) -> None:
+def serve(trusted_ui_image: str, trusted_control_server_image: str | None = None) -> None:
     pipe = WinPipe(trusted_ui_image)
     reader = TelemetryReader()
     perception_reader = PerceptionReader()
+    driver_runtime = DriverAssistRuntime(front_detector_validated=False)
+    control_session = (ControlSession(trusted_control_server_image)
+                       if trusted_control_server_image else None)
+    if control_session is not None:
+        control_session.start()
     try:
         while True:
             pipe.connect()
@@ -318,10 +441,11 @@ def serve(trusted_ui_image: str) -> None:
                 versions = hello["payload"].get("supported_versions")
                 if (not isinstance(versions, list) or not versions or
                         any(not isinstance(version, str) for version in versions) or
-                        not any(version in ("1.0", "1.1") for version in versions)):
+                        not any(version in SUPPORTED_VERSIONS for version in versions)):
                     pipe.send(message("error", hello["id"], {"code": "UNSUPPORTED_VERSION"}))
                     continue
-                selected_version = "1.1" if "1.1" in versions else "1.0"
+                selected_version = next(version for version in SUPPORTED_VERSIONS
+                                        if version in versions)
                 pipe.send(message("hello_ack", hello["id"],
                                   {"selected_version": selected_version},
                                   version=selected_version))
@@ -337,9 +461,20 @@ def serve(trusted_ui_image: str) -> None:
                     fresh_frame = perception_reader.read()
                     if fresh_frame is not None:
                         latest_frame = fresh_frame
-                    perception = (perception_payload(latest_frame, time.perf_counter_ns())
-                                  if selected_version == "1.1" else None)
-                    candidate = status_payload(summary, revision, perception)
+                    now_ns = time.perf_counter_ns()
+                    driver_tick = driver_runtime.evaluate(summary, latest_frame, now_ns)
+                    native_status = control_session.status if control_session is not None else None
+                    if native_status is not None and native_status.state is ControlState.ENGAGED:
+                        control_session.disengage(driver_tick.safety_flags)
+                    perception = (perception_payload(
+                        latest_frame, now_ns, driver_tick.lane_confidence, driver_tick.front_clear)
+                        if selected_version in ("1.1", "1.2") else None)
+                    control = control_payload(
+                        native_status,
+                        configured=control_session is not None,
+                        now_ns=now_ns,
+                    ) if selected_version == "1.2" else None
+                    candidate = status_payload(summary, revision, perception, control)
                     state_key = (candidate["state"], candidate["error_code"])
                     if last_state is not None and state_key != last_state:
                         revision += 1
@@ -362,9 +497,13 @@ def serve(trusted_ui_image: str) -> None:
                         pipe.send(message("status", request["id"], candidate,
                                           version=selected_version))
                     elif kind == "disengage" and request["payload"] == {}:
+                        if control_session is not None:
+                            control_session.disengage()
                         pipe.send(message("status", request["id"], candidate,
                                           version=selected_version))
                     elif kind == "engage":
+                        if control_session is not None:
+                            control_session.disengage()
                         requested_revision = request["payload"].get("state_revision")
                         code = ("CONTROL_UNAVAILABLE" if type(requested_revision) is int and requested_revision >= 0
                                 else "MALFORMED_MESSAGE")
@@ -376,14 +515,18 @@ def serve(trusted_ui_image: str) -> None:
             finally:
                 pipe.kernel.DisconnectNamedPipe(pipe.handle)
     finally:
+        if control_session is not None:
+            control_session.close()
         pipe.close()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="ETS2AP UI status service")
     parser.add_argument("--trusted-ui-image", required=True, help="canonical path of the trusted UI executable")
+    parser.add_argument("--trusted-control-server-image",
+                        help="canonical path of the selected ETS2 executable")
     args = parser.parse_args()
-    serve(args.trusted_ui_image)
+    serve(args.trusted_ui_image, args.trusted_control_server_image)
 
 
 if __name__ == "__main__":

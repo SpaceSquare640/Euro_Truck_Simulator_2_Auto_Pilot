@@ -295,6 +295,86 @@
       },
       "additionalProperties": true
     },
+    "nativeControlStatus": {
+      "type": "object",
+      "required": [
+        "connection",
+        "state",
+        "reason"
+      ],
+      "properties": {
+        "connection": {
+          "type": "string",
+          "enum": [
+            "not_configured",
+            "disconnected",
+            "connected"
+          ]
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "disengaged",
+            "engaged",
+            "manual_override_latched",
+            "timeout",
+            "rejected",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "none",
+            "manual_input",
+            "command_timeout",
+            "malformed_packet",
+            "version_mismatch",
+            "client_disconnected",
+            "telemetry_unavailable",
+            null
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "connection": {
+              "enum": [
+                "not_configured",
+                "disconnected"
+              ]
+            },
+            "state": {
+              "type": "null"
+            },
+            "reason": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "properties": {
+            "connection": {
+              "const": "connected"
+            },
+            "state": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      ],
+      "additionalProperties": true
+    },
     "config": {
       "type": "object",
       "required": [
@@ -495,6 +575,9 @@
                 },
                 "perception": {
                   "$ref": "#/$defs/perceptionSummary"
+                },
+                "control": {
+                  "$ref": "#/$defs/nativeControlStatus"
                 },
                 "state_revision": {
                   "type": "integer",

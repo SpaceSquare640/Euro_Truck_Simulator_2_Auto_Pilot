@@ -148,6 +148,7 @@ public partial class MainWindow : Window
         _preferences.GameFolder = dialog.FolderName;
         _preferences.Save();
         UpdateFolderStatus();
+        RestartPythonService();
     }
 
     private async void InstallConnector_Click(object sender, RoutedEventArgs e)
@@ -297,7 +298,8 @@ public partial class MainWindow : Window
         {
             process = new Process
             {
-                StartInfo = PythonServiceLauncher.CreateStartInfo(_pythonInstallRoot, _uiExecutable),
+                StartInfo = PythonServiceLauncher.CreateStartInfo(
+                    _pythonInstallRoot, _uiExecutable, TrustedControlServerImage()),
                 EnableRaisingEvents = true
             };
             process.Exited += PythonServiceProcess_Exited;
@@ -318,6 +320,30 @@ public partial class MainWindow : Window
                 process.Dispose();
             }
             ApplyStatus(null);
+        }
+    }
+
+    private void RestartPythonService()
+    {
+        if (_isClosing || _pythonInstallRoot is null || _uiExecutable is null) return;
+        StopPythonService();
+        StartPythonService();
+    }
+
+    private string? TrustedControlServerImage()
+    {
+        string? gameFolder = _preferences.GameFolder;
+        if (string.IsNullOrWhiteSpace(gameFolder)) return null;
+        try
+        {
+            string image = Path.GetFullPath(Path.Combine(
+                gameFolder, "bin", "win_x64", "eurotrucks2.exe"));
+            return File.Exists(image) ? image : null;
+        }
+        catch (Exception error) when (error is ArgumentException or IOException or
+            UnauthorizedAccessException or NotSupportedException)
+        {
+            return null;
         }
     }
 
@@ -385,7 +411,7 @@ public partial class MainWindow : Window
             SpeedValue.Text = SpeedLimitValue.Text = DistanceValue.Text = "--";
             ApplyPerception(null);
             GameCheck.Text = ConnectorCheck.Text = Strings.Pending;
-            ControlCheck.Text = Strings.Unavailable;
+            ControlCheck.Text = Strings.NotProvided;
             AutomationStateValue.Text = Strings.OfflineState;
             return;
         }
@@ -416,7 +442,40 @@ public partial class MainWindow : Window
             : status.ErrorCode is "TELEMETRY_UNAVAILABLE" or "TELEMETRY_STALE"
                 ? Strings.Unavailable
                 : Strings.Pending;
-        ControlCheck.Text = Strings.Unavailable;
+        ControlCheck.Text = DescribeNativeControlStatus(status.Control);
+    }
+
+    private static string DescribeNativeControlStatus(NativeControlStatus? status)
+    {
+        if (status is null) return Strings.NotProvided;
+        if (status.Connection == "not_configured") return Strings.ControlLinkNotConfigured;
+        if (status.Connection == "disconnected") return Strings.ControlLinkDisconnected;
+
+        string nativeState = status.State switch
+        {
+            "disengaged" => Strings.NativeControlDisengaged,
+            "engaged" => Strings.NativeControlEngaged,
+            "manual_override_latched" => Strings.NativeControlManualOverride,
+            "timeout" => Strings.NativeControlTimeout,
+            "rejected" => Strings.NativeControlRejected,
+            _ => Strings.NotProvided
+        };
+        if (status.Reason == "none")
+            return string.Format(CultureInfo.CurrentCulture,
+                Strings.ControlLinkConnectedStateFormat, nativeState);
+
+        string nativeReason = status.Reason switch
+        {
+            "manual_input" => Strings.NativeReasonManualInput,
+            "command_timeout" => Strings.NativeReasonCommandTimeout,
+            "malformed_packet" => Strings.NativeReasonMalformedPacket,
+            "version_mismatch" => Strings.NativeReasonVersionMismatch,
+            "client_disconnected" => Strings.NativeReasonClientDisconnected,
+            "telemetry_unavailable" => Strings.NativeReasonTelemetryUnavailable,
+            _ => Strings.NotProvided
+        };
+        return string.Format(CultureInfo.CurrentCulture,
+            Strings.ControlLinkConnectedStateReasonFormat, nativeState, nativeReason);
     }
 
     private void ApplyPerception(PerceptionStatus? status)

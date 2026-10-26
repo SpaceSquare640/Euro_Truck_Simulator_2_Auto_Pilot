@@ -6,11 +6,13 @@ namespace ETS2AP.Ui;
 
 internal sealed record UiStatus(string State, string? ErrorCode, long Revision,
     double? SpeedMps, double? SpeedLimitMps, double? DistanceM, double? AgeS,
-    PerceptionStatus? Perception);
+    PerceptionStatus? Perception, NativeControlStatus? Control);
 
 internal sealed record PerceptionStatus(bool FrameValid, double? FrameAgeS,
     bool GameFocused, bool InputMonitorHealthy, bool ManualInputActive,
     double? LaneConfidence, bool? FrontClear);
+
+internal sealed record NativeControlStatus(string Connection, string? State, string? Reason);
 
 internal static class UiStatusProtocol
 {
@@ -63,6 +65,7 @@ internal static class UiStatusProtocol
         if (revision < 0) throw new InvalidDataException("Invalid state revision.");
         JsonElement telemetry = payload.GetProperty("telemetry");
         PerceptionStatus? perception = null;
+        NativeControlStatus? control = null;
         if (payload.TryGetProperty("perception", out JsonElement perceptionElement))
         {
             bool frameValid = RequiredBoolean(perceptionElement, "frame_valid");
@@ -77,11 +80,29 @@ internal static class UiStatusProtocol
             perception = new PerceptionStatus(frameValid, frameAge, gameFocused,
                 monitorHealthy, manualInput, confidence, frontClear);
         }
+        if (payload.TryGetProperty("control", out JsonElement controlElement))
+        {
+            if (controlElement.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("Invalid native control status.");
+            string connection = RequiredString(controlElement, "connection");
+            string? nativeState = OptionalNullableString(controlElement, "state");
+            string? reason = OptionalNullableString(controlElement, "reason");
+            if (connection is not ("not_configured" or "disconnected" or "connected") ||
+                nativeState is not null and not ("disengaged" or "engaged" or
+                    "manual_override_latched" or "timeout" or "rejected") ||
+                reason is not null and not ("none" or "manual_input" or "command_timeout" or
+                    "malformed_packet" or "version_mismatch" or "client_disconnected" or
+                    "telemetry_unavailable") ||
+                (connection == "connected" && (nativeState is null || reason is null)) ||
+                (connection != "connected" && (nativeState is not null || reason is not null)))
+                throw new InvalidDataException("Invalid native control status.");
+            control = new NativeControlStatus(connection, nativeState, reason);
+        }
         return new UiStatus(state, code, revision,
             OptionalNonnegative(telemetry, "speed_mps"),
             OptionalNonnegative(telemetry, "speed_limit_mps"),
             OptionalNonnegative(telemetry, "navigation_distance_m"),
-            OptionalNonnegative(telemetry, "telemetry_age_s"), perception);
+            OptionalNonnegative(telemetry, "telemetry_age_s"), perception, control);
     }
 
     internal static void ValidateHelloAck(ReadOnlySpan<byte> json, string requestId)
@@ -92,7 +113,7 @@ internal static class UiStatusProtocol
         JsonElement root = document.RootElement;
         if (RequiredString(root, "type") != "hello_ack" || RequiredString(root, "id") != requestId ||
             RequiredString(root, "version") != RequiredString(root.GetProperty("payload"), "selected_version") ||
-            RequiredString(root.GetProperty("payload"), "selected_version") is not ("1.0" or "1.1"))
+            RequiredString(root.GetProperty("payload"), "selected_version") is not ("1.0" or "1.1" or "1.2"))
             throw new InvalidDataException("Invalid UI handshake.");
     }
 
@@ -135,6 +156,12 @@ internal static class UiStatusProtocol
             JsonValueKind.Null => null,
             _ => throw new InvalidDataException("Invalid perception classification.")
         };
+    }
+
+    private static string? OptionalNullableString(JsonElement value, string name)
+    {
+        JsonElement field = value.GetProperty(name);
+        return field.ValueKind == JsonValueKind.Null ? null : RequiredString(value, name);
     }
 
     private static string RequiredString(JsonElement value, string name)

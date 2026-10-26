@@ -17,7 +17,8 @@ internal static class PythonServiceLauncher
             File.Exists(uiExecutable);
     }
 
-    internal static ProcessStartInfo CreateStartInfo(string installRoot, string uiExecutable)
+    internal static ProcessStartInfo CreateStartInfo(string installRoot, string uiExecutable,
+        string? trustedControlServerImage = null)
     {
         string root = Path.GetFullPath(installRoot);
         var start = new ProcessStartInfo
@@ -34,6 +35,14 @@ internal static class PythonServiceLauncher
         start.ArgumentList.Add("ets2ap.ui_server");
         start.ArgumentList.Add("--trusted-ui-image");
         start.ArgumentList.Add(Path.GetFullPath(uiExecutable));
+        if (!string.IsNullOrWhiteSpace(trustedControlServerImage))
+        {
+            string serverImage = Path.GetFullPath(trustedControlServerImage);
+            if (!File.Exists(serverImage))
+                throw new FileNotFoundException("The trusted control-server executable does not exist.", serverImage);
+            start.ArgumentList.Add("--trusted-control-server-image");
+            start.ArgumentList.Add(serverImage);
+        }
         return start;
     }
 }

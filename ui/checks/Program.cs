@@ -33,6 +33,8 @@ internal static class Program
             ("Preferences parsing and round trip", CheckPreferences),
             ("Navigation state and shortcuts", CheckNavigation),
             ("UI status protocol", CheckStatusProtocol),
+            ("UI v1.2 handshake", CheckUiV12HelloAck),
+            ("UI native control status", CheckNativeControlStatus),
             ("Raw input safety state", CheckRawInputSafetyState),
             ("Perception frame protocol", CheckPerceptionFrameProtocol),
             ("Bundled Python service launch and restart policy", CheckPythonServiceLaunchConfiguration),
@@ -209,6 +211,7 @@ internal static class Program
         Require(UiStatusProtocol.ReadType(bytes) == "status", "Valid envelope was not parsed.");
         UiStatus parsed = UiStatusProtocol.ParseStatus(bytes);
         Require(parsed.SpeedMps == 10 && parsed.ErrorCode == "CONTROL_UNAVAILABLE", "Valid status was not parsed.");
+        Require(parsed.Control is null, "UI v1.0 must not infer native control status.");
         Require(Reject(valid.Replace("\"speed_mps\":10", "\"speed_mps\":-1")),
             "Negative speed was accepted.");
         Require(Reject(valid.Replace("\"state\":\"fault\"", "\"state\":\"engaged\",\"state\":\"fault\"")),
@@ -222,6 +225,34 @@ internal static class Program
                 InputMonitorHealthy: false, ManualInputActive: false, LaneConfidence: 0.8,
                 FrontClear: null },
             "UI v1.1 perception safety state was not preserved.");
+        Require(withPerception.Control is null, "UI v1.1 must omit native control status.");
+    }
+
+    private static void CheckUiV12HelloAck()
+    {
+        const string helloAck = "{\"type\":\"hello_ack\",\"version\":\"1.2\",\"id\":\"u-4\",\"timestamp\":\"125\",\"payload\":{\"selected_version\":\"1.2\"}}";
+        UiStatusProtocol.ValidateHelloAck(Encoding.UTF8.GetBytes(helloAck), "u-4");
+        const string legacyHelloAck = "{\"type\":\"hello_ack\",\"version\":\"1.1\",\"id\":\"u-5\",\"timestamp\":\"126\",\"payload\":{\"selected_version\":\"1.1\"}}";
+        UiStatusProtocol.ValidateHelloAck(Encoding.UTF8.GetBytes(legacyHelloAck), "u-5");
+    }
+
+    private static void CheckNativeControlStatus()
+    {
+        const string status = "{\"type\":\"status\",\"version\":\"1.2\",\"id\":\"p-4\",\"timestamp\":\"126\",\"payload\":{\"state\":\"fault\",\"error_code\":\"CONTROL_UNAVAILABLE\",\"state_revision\":0,\"telemetry\":{\"speed_mps\":10,\"speed_limit_mps\":20,\"navigation_distance_m\":1250,\"telemetry_age_s\":0.1},\"control\":{\"connection\":\"connected\",\"state\":\"engaged\",\"reason\":\"none\"}}}";
+        UiStatus parsed = UiStatusProtocol.ParseStatus(Encoding.UTF8.GetBytes(status));
+        PropertyInfo? controlProperty = typeof(UiStatus).GetProperty("Control");
+        Require(controlProperty is not null, "UI status must expose native Control.v1 state.");
+        object? control = controlProperty!.GetValue(parsed);
+        Require(control is not null, "Native Control.v1 status was not parsed.");
+        Type type = control!.GetType();
+        Require(type.GetProperty("Connection")?.GetValue(control) as string == "connected" &&
+                type.GetProperty("State")?.GetValue(control) as string == "engaged" &&
+                type.GetProperty("Reason")?.GetValue(control) as string == "none",
+            "Native connection, state, and reason were not preserved.");
+        Require(Reject(status.Replace("\"state\":\"engaged\"", "\"state\":\"unknown\"")),
+            "An unknown native state was accepted.");
+        Require(Reject(status.Replace("\"connection\":\"connected\"", "\"connection\":\"disconnected\"")),
+            "A disconnected channel with a native state was accepted.");
     }
 
     private static void CheckRawInputSafetyState()

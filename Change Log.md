@@ -5,6 +5,8 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- UI IPC v1.2 Control.v1 connection and native state diagnostics in the Overview; v1.0 and v1.1 remain supported, and engagement stays disabled. (OpenAI-Codex_Responsible: Source_Code)
+- Connected the Python service to DriverAssistRuntime and the native Control.v1 status pipe when a saved ETS2 executable path is available; engagement remains denied and only neutral/disengaged commands are sent. (OpenAI-Codex_Responsible: Source_Code)
 - UI IPC v1.1 perception summary and an Overview readiness panel for frame capture, focus, input monitoring, lane confidence, and front-obstacle status. (OpenAI-Codex_Responsible: Source_Code)
 - Added the internal `gameframe.v1` shared-memory contract and a native D3D11 Present capture prototype; WPF prefers its fresh frames and keeps GDI capture as fallback. In-game hook compatibility is unverified. (OpenAI-Codex_Responsible: Source_Code)
 - Added a 160 × 90 RGB24 perception mapping and WPF desktop capture/input-monitor publisher. The lane estimator is a prototype; the front-clear detector remains unvalidated and disabled by default. (OpenAI-Codex_Responsible: Source_Code)
@@ -12,6 +14,7 @@ All notable changes to this project are documented here and published on the pro
 - Added Control.v1.1 safety-claim packets and server capability negotiation; the client will not engage with a legacy server, and native engagement stays blocked while its local input-monitor gate is unavailable. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
+- Decoupled the neutral Control.v1 heartbeat from status reads and capped it at a 50 ms interval to prevent status updates from driving command traffic. (OpenAI-Codex_Responsible: Source_Code)
 - Native UI authorization now fails closed; WPF input-monitor health remains unavailable until physical-device coverage is validated. Corrected Raw Input mouse-button release tracking. (OpenAI-Codex_Responsible: Source_Code)
 - Documented the current fixed 0.30 steering cap and marked speed-dependent steering calibration as unfinished. (OpenAI-Codex_Responsible: Source_Code)
 - Linked the perception mapping contract from the shared IPC overview and architecture; documented capture, controller-coverage, and detector-validation limits. (OpenAI-Codex_Responsible: Source_Code)
