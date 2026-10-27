@@ -1,6 +1,8 @@
-// Edited by: OpenAI-Codex_Responsible: Source_Code
+// Edited by: OpenAI-Codex (OpenAI-Codex_Responsible: Source_Code)
 #include "ets2ap/plugin/control_host.h"
 #include "ets2ap/plugin/control_pipe_server.h"
+#include "ets2ap/plugin/physical_input_pipe_server.h"
+#include "ets2ap/plugin/physical_input_monitor.h"
 #include "ets2ap/test/test_framework.h"
 
 #include <algorithm>
@@ -16,6 +18,8 @@
 #include <iostream>
 #include <mutex>
 #include <optional>
+#include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -27,6 +31,18 @@ using namespace ets2ap::plugin;
 namespace {
 constexpr std::uint64_t kStartNs = 2'000'000'000ULL;
 constexpr std::uint32_t kCommandMagic = 0x50413243U;
+
+std::optional<bool> IsCurrentProcessAppContainer() noexcept {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return std::nullopt;
+    BOOL is_app_container = FALSE;
+    DWORD returned = 0;
+    const BOOL queried = GetTokenInformation(token, TokenIsAppContainer, &is_app_container,
+        sizeof(is_app_container), &returned);
+    CloseHandle(token);
+    if (!queried || returned < sizeof(is_app_container)) return std::nullopt;
+    return is_app_container != FALSE;
+}
 
 void PutLittleEndian(std::vector<std::byte>& bytes, std::size_t offset,
                      std::uint64_t value, std::size_t width) {
@@ -73,6 +89,10 @@ struct CapturedOutput {
 ControlHostOptions OptionsFor(std::atomic<std::uint64_t>& now_ns,
                               CapturedOutput& output) {
     ControlHostOptions options{};
+    options.sample_physical_input = [] {
+        return PhysicalInputStatus{.sample_valid = true, .healthy = true,
+                                   .manual_input_active = false};
+    };
     options.now_ns = [&now_ns] {
         return std::optional<std::uint64_t>{now_ns.load(std::memory_order_acquire)};
     };
@@ -113,6 +133,33 @@ std::optional<std::uint64_t> QpcNowNs() {
     const auto whole = ticks_u / frequency_u;
     const auto remainder = ticks_u % frequency_u;
     return whole * 1'000'000'000ULL + (remainder * 1'000'000'000ULL) / frequency_u;
+}
+
+std::uint16_t NoKeyboardKeyDown(int) noexcept { return 0; }
+
+std::uint16_t OnlyLegacyPressedBit(int) noexcept { return 0x0001U; }
+
+std::uint16_t OneKeyboardKeyDown(int key) noexcept {
+    return key == 0x41 ? 0x8000U : 0U;
+}
+
+std::array<std::byte, kKeyboardInputFrameSize> KeyboardInputFrame(
+    std::uint64_t sequence, std::uint16_t flags) {
+    std::array<std::byte, kKeyboardInputFrameSize> bytes{};
+    bytes[0] = std::byte{'E'};
+    bytes[1] = std::byte{'2'};
+    bytes[2] = std::byte{'P'};
+    bytes[3] = std::byte{'I'};
+    const auto put = [&bytes](std::size_t offset, std::uint64_t value, std::size_t width) {
+        for (std::size_t index = 0; index < width; ++index) {
+            bytes[offset + index] = static_cast<std::byte>((value >> (index * 8)) & 0xFFU);
+        }
+    };
+    put(4, 1, 2);
+    put(6, flags, 2);
+    put(8, kKeyboardInputFrameSize, 4);
+    put(12, sequence, 8);
+    return bytes;
 }
 
 std::optional<DWORD> RunPythonPipeSmoke(const std::wstring& python_path,
@@ -164,6 +211,343 @@ std::optional<DWORD> RunPythonPipeSmoke(const std::wstring& python_path,
 
 } // namespace
 
+ETS2AP_TEST(PhysicalInputMonitorRequiresValidatedCoverageAndRejectsUnknownHid) {
+    const PhysicalInputSample verified{
+        .keyboard_state_observed = true,
+        .xinput_probe_available = true,
+        .device_inventory_available = true,
+        .keyboard_active = false,
+        .xinput_active = false,
+        .unclassified_hid_present = false,
+        .coverage_validated = true};
+    const auto verified_status = EvaluatePhysicalInputSample(verified);
+    CHECK(verified_status.sample_valid);
+    CHECK(verified_status.healthy);
+    CHECK(!verified_status.manual_input_active);
+
+    auto unknown_device = verified;
+    unknown_device.unclassified_hid_present = true;
+    const auto unknown_status = EvaluatePhysicalInputSample(unknown_device);
+    CHECK(unknown_status.sample_valid);
+    CHECK(!unknown_status.healthy);
+
+    auto unvalidated_coverage = verified;
+    unvalidated_coverage.coverage_validated = false;
+    CHECK(!EvaluatePhysicalInputSample(unvalidated_coverage).healthy);
+}
+
+ETS2AP_TEST(PhysicalInputMonitorReportsKeyboardAndXInputActivity) {
+    PhysicalInputSample sample{
+        .keyboard_state_observed = true,
+        .xinput_probe_available = true,
+        .device_inventory_available = true,
+        .keyboard_active = true,
+        .xinput_active = false,
+        .unclassified_hid_present = false,
+        .coverage_validated = false};
+    CHECK(EvaluatePhysicalInputSample(sample).manual_input_active);
+
+    sample.keyboard_active = false;
+    sample.xinput_active = true;
+    CHECK(EvaluatePhysicalInputSample(sample).manual_input_active);
+}
+
+ETS2AP_TEST(KeyboardProbeRequiresPositiveKeyDownEvidence) {
+    CHECK(!HasObservableKeyboardActivity(&NoKeyboardKeyDown));
+    CHECK(!HasObservableKeyboardActivity(&OnlyLegacyPressedBit));
+    CHECK(HasObservableKeyboardActivity(&OneKeyboardKeyDown));
+    CHECK(!HasObservableKeyboardActivity(nullptr));
+}
+
+ETS2AP_TEST(KeyboardInputPipeRejectsInvalidFramesAndExpiresStaleReports) {
+    auto frame = KeyboardInputFrame(1, 0x0001U);
+    KeyboardInputReport report{};
+    CHECK(DecodeKeyboardInputFrame(frame, 0, report));
+    CHECK_EQ(report.sequence, 1ULL);
+    CHECK(report.raw_input_available);
+    CHECK(!report.manual_input_active);
+    CHECK(!DecodeKeyboardInputFrame(frame, report.sequence, report));
+
+    auto unknown_flags = KeyboardInputFrame(2, 0x0004U);
+    CHECK(!DecodeKeyboardInputFrame(unknown_flags, 1, report));
+    auto zero_sequence = KeyboardInputFrame(0, 0x0001U);
+    CHECK(!DecodeKeyboardInputFrame(zero_sequence, 0, report));
+    frame.back() = std::byte{1};
+    CHECK(!DecodeKeyboardInputFrame(frame, 0, report));
+
+    KeyboardInputReportState state;
+    const auto start = std::chrono::steady_clock::time_point{};
+    state.BeginConnection();
+    auto observation = state.Snapshot(start);
+    CHECK(!observation.available);
+    CHECK(observation.manual_input_active);
+    CHECK(state.Update(report = KeyboardInputReport{1, true, false}, start));
+    observation = state.Snapshot(start + std::chrono::milliseconds{249});
+    CHECK(observation.available);
+    CHECK(!observation.manual_input_active);
+    observation = state.Snapshot(start + std::chrono::milliseconds{250});
+    CHECK(!observation.available);
+    CHECK(observation.manual_input_active);
+    CHECK(!state.Update(report, start + std::chrono::milliseconds{251}));
+    state.Disconnect();
+    observation = state.Snapshot(start + std::chrono::milliseconds{252});
+    CHECK(!observation.available);
+    CHECK(observation.manual_input_active);
+}
+
+ETS2AP_TEST(PhysicalInputPipeAuthenticatesLocalImageAndFailsClosedOnUnresolvablePath) {
+    std::array<wchar_t, 32768> image{};
+    const DWORD image_length = GetModuleFileNameW(nullptr, image.data(),
+                                                   static_cast<DWORD>(image.size()));
+    CHECK(image_length > 0 && image_length < image.size());
+    if (image_length == 0 || image_length >= image.size()) return;
+    const std::wstring image_path(image.data(), image_length);
+    HANDLE image_handle = CreateFileW(image_path.c_str(), FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    std::array<wchar_t, 32768> canonical_image{};
+    const DWORD canonical_length = image_handle == INVALID_HANDLE_VALUE ? 0 :
+        GetFinalPathNameByHandleW(image_handle, canonical_image.data(),
+            static_cast<DWORD>(canonical_image.size()), 0x00000002U);
+    const DWORD canonical_error = GetLastError();
+    if (image_handle != INVALID_HANDLE_VALUE) CloseHandle(image_handle);
+    if (canonical_length == 0 || canonical_length >= canonical_image.size()) {
+        const std::wstring unavailable_pipe = L"\\\\.\\pipe\\ETS2AP_PhysicalInput_test_" +
+            std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(GetTickCount64());
+        KeyboardInputReportState unavailable_state;
+        PhysicalInputPipeServer unavailable_server(
+            {image_path, unavailable_pipe}, unavailable_state);
+        CHECK(!unavailable_server.Start());
+        CHECK_EQ(unavailable_server.LastError(), canonical_error);
+        const auto unavailable = unavailable_state.Snapshot(std::chrono::steady_clock::now());
+        CHECK(!unavailable.available);
+        CHECK(unavailable.manual_input_active);
+        std::cout << "PhysicalInputPipe peer flow not exercised: test image path "
+                  << "cannot be canonicalized (Win32 " << canonical_error << ")\n";
+        return;
+    }
+
+    const std::wstring pipe_name = L"\\\\.\\pipe\\ETS2AP_PhysicalInput_test_" +
+        std::to_wstring(GetCurrentProcessId()) + L"_" + std::to_wstring(GetTickCount64());
+    const auto app_container = IsCurrentProcessAppContainer();
+    CHECK(app_container.has_value());
+    if (!app_container.has_value()) return;
+
+    KeyboardInputReportState state;
+    PhysicalInputPipeServer server({image_path, pipe_name}, state);
+    const bool server_started = server.Start();
+    if (!server_started) std::cerr << "Physical input server start error: " << server.LastError() << '\n';
+    CHECK(server_started);
+    if (!server_started) return;
+
+    const auto listen_deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    while (!server.IsListening() && std::chrono::steady_clock::now() < listen_deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    CHECK(server.IsListening());
+    if (!server.IsListening()) {
+        server.Stop();
+        return;
+    }
+
+    if (*app_container) {
+        HANDLE denied_client = CreateFileW(pipe_name.c_str(), GENERIC_WRITE, 0, nullptr,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        const DWORD connect_error = denied_client == INVALID_HANDLE_VALUE
+            ? GetLastError() : ERROR_SUCCESS;
+        CHECK_EQ(denied_client, INVALID_HANDLE_VALUE);
+        CHECK_EQ(connect_error, static_cast<DWORD>(ERROR_ACCESS_DENIED));
+        if (denied_client != INVALID_HANDLE_VALUE) CloseHandle(denied_client);
+        const auto unavailable = state.Snapshot(std::chrono::steady_clock::now());
+        CHECK(!unavailable.available);
+        CHECK(unavailable.manual_input_active);
+        std::cout << "PhysicalInputPipe positive peer flow not exercised: current-user ACL "
+                  << "rejects AppContainer clients; fail-closed state verified\n";
+        server.Stop();
+        return;
+    }
+
+    HANDLE client = INVALID_HANDLE_VALUE;
+    const auto connect_deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    while (client == INVALID_HANDLE_VALUE && std::chrono::steady_clock::now() < connect_deadline) {
+        client = CreateFileW(pipe_name.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
+                             FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (client == INVALID_HANDLE_VALUE) std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    }
+    if (client == INVALID_HANDLE_VALUE) {
+        std::cout << "PhysicalInput pipe connect error=" << GetLastError()
+                  << "; server running=" << server.IsRunning()
+                  << "; listening=" << server.IsListening()
+                  << "; server error=" << server.LastError() << '\n';
+    }
+    CHECK(client != INVALID_HANDLE_VALUE);
+    if (client == INVALID_HANDLE_VALUE) {
+        server.Stop();
+        return;
+    }
+
+    auto frame = KeyboardInputFrame(1, 0x0001U);
+    DWORD written = 0;
+    CHECK(WriteFile(client, frame.data(), static_cast<DWORD>(frame.size()), &written, nullptr));
+    CHECK_EQ(written, static_cast<DWORD>(frame.size()));
+
+    KeyboardInputObservation observation{};
+    const auto report_deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    do {
+        observation = state.Snapshot(std::chrono::steady_clock::now());
+        if (observation.available) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    } while (std::chrono::steady_clock::now() < report_deadline);
+    if (!observation.available) {
+        std::cout << "PhysicalInput report timeout; server running=" << server.IsRunning()
+                  << "; listening=" << server.IsListening()
+                  << "; server error=" << server.LastError() << '\n';
+    }
+    CHECK(observation.available);
+    CHECK(!observation.manual_input_active);
+
+    CloseHandle(client);
+    const auto disconnect_deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    do {
+        observation = state.Snapshot(std::chrono::steady_clock::now());
+        if (!observation.available) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    } while (std::chrono::steady_clock::now() < disconnect_deadline);
+    CHECK(!observation.available);
+    CHECK(observation.manual_input_active);
+    server.Stop();
+}
+
+ETS2AP_TEST(PhysicalInputMonitorFailsClosedWhenAProbeIsUnavailable) {
+    const PhysicalInputSample sample{
+        .keyboard_state_observed = true,
+        .xinput_probe_available = false,
+        .device_inventory_available = true,
+        .keyboard_active = false,
+        .xinput_active = false,
+        .unclassified_hid_present = false,
+        .coverage_validated = true};
+    const auto status = EvaluatePhysicalInputSample(sample);
+    CHECK(!status.sample_valid);
+    CHECK(!status.healthy);
+    CHECK(status.manual_input_active);
+}
+
+ETS2AP_TEST(PhysicalInputMonitorFailsClosedWhenKeyboardStateIsUnobservable) {
+    const PhysicalInputSample sample{
+        .keyboard_state_observed = false,
+        .xinput_probe_available = true,
+        .device_inventory_available = true,
+        .keyboard_active = false,
+        .xinput_active = false,
+        .unclassified_hid_present = false,
+        .coverage_validated = true};
+    const auto status = EvaluatePhysicalInputSample(sample);
+    CHECK(!status.sample_valid);
+    CHECK(!status.healthy);
+    CHECK(status.manual_input_active);
+}
+
+ETS2AP_TEST(SystemPhysicalInputMonitorStaysFailClosedUntilCoverageIsValidated) {
+    const auto sample = ReadSystemPhysicalInputSample();
+    CHECK(!sample.coverage_validated);
+    CHECK(!EvaluatePhysicalInputSample(sample).healthy);
+}
+
+ETS2AP_TEST(ControlHostLocalInputMonitorBlocksEngagement) {
+    std::atomic<std::uint64_t> now_ns{kStartNs};
+    std::atomic<bool> monitor_healthy{false};
+    CapturedOutput output;
+    auto options = OptionsFor(now_ns, output);
+    options.sample_physical_input = [&monitor_healthy] {
+        return PhysicalInputStatus{.sample_valid = true,
+                                   .healthy = monitor_healthy.load(std::memory_order_acquire),
+                                   .manual_input_active = false};
+    };
+    ControlHost host(std::move(options));
+    CHECK(host.Start());
+    CHECK(host.Connect());
+    now_ns.store(kStartNs + 1, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(1, kStartNs + 1)).outcome,
+             CommandOutcome::Accepted);
+    now_ns.store(kStartNs + 2, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(2, kStartNs + 2, 0, 0.5, 0, true), SafeGates()).outcome,
+             CommandOutcome::SafetyBlocked);
+    const auto snapshot = host.Snapshot();
+    CHECK(snapshot.state == ControlState::Disengaged);
+    CHECK(snapshot.steering == 0.0 && snapshot.throttle == 0.0 && snapshot.brake == 0.0);
+    host.Stop();
+}
+
+ETS2AP_TEST(ControlHostInputMonitorDisengagesWithoutANewCommand) {
+    std::atomic<std::uint64_t> now_ns{kStartNs};
+    std::atomic<bool> physical_input_active{false};
+    CapturedOutput output;
+    auto options = OptionsFor(now_ns, output);
+    options.sample_physical_input = [&physical_input_active] {
+        return PhysicalInputStatus{.sample_valid = true, .healthy = true,
+                                   .manual_input_active = physical_input_active.load(
+                                       std::memory_order_acquire)};
+    };
+    ControlHost host(std::move(options));
+    CHECK(host.Start());
+    CHECK(host.Connect());
+
+    now_ns.store(kStartNs + 1, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(1, kStartNs + 1)).outcome,
+             CommandOutcome::Accepted);
+    now_ns.store(kStartNs + 2, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(2, kStartNs + 2, 0, 0.5, 0, true), SafeGates()).outcome,
+             CommandOutcome::Accepted);
+    now_ns.store(kStartNs + 20'000'002ULL, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(3, kStartNs + 20'000'002ULL, 0, 0.5, 0, true),
+                                SafeGates()).outcome, CommandOutcome::Accepted);
+    CHECK(WaitForSnapshot(output, [](const ControlSnapshot& snapshot) {
+        return snapshot.state == ControlState::Engaged && snapshot.throttle > 0.0;
+    }));
+
+    physical_input_active.store(true, std::memory_order_release);
+    CHECK(WaitForSnapshot(output, [](const ControlSnapshot& snapshot) {
+        return snapshot.state == ControlState::ManualOverrideLatched &&
+               snapshot.steering == 0.0 && snapshot.throttle == 0.0 && snapshot.brake == 0.0;
+    }));
+    host.Stop();
+}
+
+ETS2AP_TEST(ControlHostLosingHealthyInputMonitorNeutralizesOutputs) {
+    std::atomic<std::uint64_t> now_ns{kStartNs};
+    std::atomic<bool> monitor_healthy{true};
+    CapturedOutput output;
+    auto options = OptionsFor(now_ns, output);
+    options.sample_physical_input = [&monitor_healthy] {
+        return PhysicalInputStatus{.sample_valid = true,
+                                   .healthy = monitor_healthy.load(std::memory_order_acquire),
+                                   .manual_input_active = false};
+    };
+    ControlHost host(std::move(options));
+    CHECK(host.Start());
+    CHECK(host.Connect());
+
+    now_ns.store(kStartNs + 1, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(1, kStartNs + 1)).outcome,
+             CommandOutcome::Accepted);
+    now_ns.store(kStartNs + 2, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(2, kStartNs + 2, 0, 0.5, 0, true), SafeGates()).outcome,
+             CommandOutcome::Accepted);
+    now_ns.store(kStartNs + 20'000'002ULL, std::memory_order_release);
+    CHECK_EQ(host.AcceptCommand(Packet(3, kStartNs + 20'000'002ULL, 0, 0.5, 0, true),
+                                SafeGates()).outcome, CommandOutcome::Accepted);
+    CHECK(WaitForSnapshot(output, [](const ControlSnapshot& snapshot) {
+        return snapshot.state == ControlState::Engaged && snapshot.throttle > 0.0;
+    }));
+
+    monitor_healthy.store(false, std::memory_order_release);
+    CHECK(WaitForSnapshot(output, [](const ControlSnapshot& snapshot) {
+        return snapshot.state == ControlState::ManualOverrideLatched &&
+               snapshot.steering == 0.0 && snapshot.throttle == 0.0 && snapshot.brake == 0.0;
+    }));
+    host.Stop();
+}
+
 ETS2AP_TEST(ControlHostWatchdogRunsWithoutNewCommands) {
     std::atomic<std::uint64_t> now_ns{kStartNs};
     CapturedOutput output;
@@ -202,8 +586,15 @@ ETS2AP_TEST(ControlHostWatchdogRunsWithoutNewCommands) {
 
 ETS2AP_TEST(ControlHostManualOverridePublishesNeutralImmediately) {
     std::atomic<std::uint64_t> now_ns{kStartNs};
+    std::atomic<bool> physical_input_active{false};
     CapturedOutput output;
-    ControlHost host(OptionsFor(now_ns, output));
+    auto options = OptionsFor(now_ns, output);
+    options.sample_physical_input = [&physical_input_active] {
+        return PhysicalInputStatus{.sample_valid = true, .healthy = true,
+                                   .manual_input_active = physical_input_active.load(
+                                       std::memory_order_acquire)};
+    };
+    ControlHost host(std::move(options));
     CHECK(host.Start());
     CHECK(host.Connect());
 
@@ -220,11 +611,12 @@ ETS2AP_TEST(ControlHostManualOverridePublishesNeutralImmediately) {
         return snapshot.state == ControlState::Engaged && snapshot.throttle > 0.0;
     }));
 
-    host.SetManualInput(true);
+    physical_input_active.store(true, std::memory_order_release);
     CHECK(WaitForSnapshot(output, [](const ControlSnapshot& snapshot) {
         return snapshot.state == ControlState::ManualOverrideLatched &&
                snapshot.steering == 0.0 && snapshot.throttle == 0.0 && snapshot.brake == 0.0;
     }));
+    physical_input_active.store(false, std::memory_order_release);
     host.SetManualInput(false);
     now_ns.store(kStartNs + 20'000'003ULL, std::memory_order_release);
     CHECK_EQ(host.AcceptCommand(Packet(4, kStartNs + 20'000'003ULL, 0, 0, 0,

@@ -1,4 +1,4 @@
-// Edited by: OpenAI-Codex_Responsible: Source_Code
+// Edited by: OpenAI-Codex (OpenAI-Codex_Responsible: Source_Code)
 #include "ets2ap/plugin/control_host.h"
 
 #include "ets2ap/plugin/input_plugin.h"
@@ -25,6 +25,11 @@ ControlHostOptions GlobalOptions() {
         return GlobalInputPlugin().SetCommand(command);
     };
     options.force_neutral = [] { GlobalInputPlugin().Neutralize(); };
+    options.sample_physical_input = [] {
+        const auto keyboard_input = GlobalKeyboardInputReportState().Snapshot(
+            std::chrono::steady_clock::now());
+        return EvaluatePhysicalInputSample(ReadSystemPhysicalInputSample(keyboard_input));
+    };
     return options;
 }
 
@@ -56,6 +61,7 @@ bool ControlHost::Start() noexcept {
         }
 
         core_.Disconnect();
+        RefreshPhysicalInputLocked();
         if (!PublishLocked(*now_ns)) return false;
 
         worker_ = std::jthread([this](std::stop_token stop_token) { Run(stop_token); });
@@ -102,6 +108,15 @@ bool ControlHost::IsRunning() const noexcept {
     return running_.load(std::memory_order_acquire);
 }
 
+PhysicalInputStatus ControlHost::GetPhysicalInputStatus() noexcept {
+    try {
+        const std::lock_guard lock(operation_mutex_);
+        return physical_input_status_;
+    } catch (...) {
+        return {false, false, true};
+    }
+}
+
 bool ControlHost::Connect() noexcept {
     if (!IsRunning()) return false;
     try {
@@ -134,7 +149,13 @@ input::CommandResult ControlHost::AcceptCommand(std::span<const std::byte> packe
             return {input::CommandOutcome::ConnectionFatal, true};
         }
 
-        auto result = core_.AcceptCommand(packet, *now_ns, gates);
+        RefreshPhysicalInputLocked();
+        input::SafetyGates effective_gates = gates;
+        effective_gates.input_monitor_healthy = gates.input_monitor_healthy &&
+            physical_input_status_.healthy;
+        effective_gates.manual_input_active = gates.manual_input_active ||
+            physical_input_status_.manual_input_active;
+        auto result = core_.AcceptCommand(packet, *now_ns, effective_gates);
         if (!PublishLocked(*now_ns)) {
             return {input::CommandOutcome::ConnectionFatal, true};
         }
@@ -169,6 +190,24 @@ std::optional<std::array<std::byte, 68>> ControlHost::EncodeStatus() noexcept {
         ForceNeutralLocked();
         return std::nullopt;
     }
+}
+
+void ControlHost::RefreshPhysicalInputLocked() noexcept {
+    PhysicalInputStatus next{false, false, true};
+    try {
+        if (options_.sample_physical_input) next = options_.sample_physical_input();
+    } catch (...) {
+        next = {false, false, true};
+    }
+    if (!next.sample_valid) {
+        next.healthy = false;
+        next.manual_input_active = true;
+    }
+
+    const bool lost_health = physical_input_status_.healthy && !next.healthy;
+    physical_input_status_ = next;
+    // Losing a previously healthy monitor while engaged must neutralize output immediately.
+    core_.SetManualInput(next.manual_input_active || lost_health);
 }
 
 void ControlHost::SetManualInput(bool active) noexcept {
@@ -235,6 +274,7 @@ void ControlHost::TickAndPublish() noexcept {
             ForceNeutralLocked();
             return;
         }
+        RefreshPhysicalInputLocked();
         core_.Tick(*now_ns);
         if (!PublishLocked(*now_ns)) core_.Disconnect();
     } catch (...) {

@@ -7,6 +7,7 @@ Status: v1.0 draft. This directory is the contract between the native, Python, a
 | Telemetry | native/plugin | python | 4096-byte Windows shared mapping; 240-byte v1.0 struct | [telemetry v1](ipc/telemetry.v1.md) |
 | Game frame | native/plugin | ui | 43,264-byte Windows shared mapping; 64-byte v1.0 header and 160 × 90 RGB24 frame | [gameframe v1](ipc/gameframe.v1.md) |
 | Perception | ui | python | 43,264-byte Windows shared mapping; 64-byte v1.0 header and 160 × 90 RGB24 frame | [perception v1](ipc/perception.v1.md) |
+| Physical input | ui | native/input | Windows named pipe; 24-byte v1.0 state frames, 50 ms updates, 250 ms native receive expiry | [physical input v1](ipc/physical-input.v1.md) |
 | Control | python commands; native/input status | native/input commands; python status | Windows named pipe, overlapped I/O; v1.1 command claims and server capabilities | [control v1](ipc/control.v1.md) |
 | UI | python and ui | ui and python | Windows named pipe; v1.1 adds optional perception status; engage uses state_revision | [ui v1](ipc/ui.v1.md), [JSON Schema](ipc/ui.v1.schema.json) |
 

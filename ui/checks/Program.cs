@@ -52,6 +52,8 @@ internal static class Program
             ("UI v1.2 handshake", CheckUiV12HelloAck),
             ("UI native control status", CheckNativeControlStatus),
             ("Raw input safety state", CheckRawInputSafetyState),
+            ("Physical input bridge protocol", CheckPhysicalInputBridgeProtocol),
+            ("Windows canonical peer paths", CheckWindowsCanonicalPeerPaths),
             ("Perception frame protocol", CheckPerceptionFrameProtocol),
             ("Bundled Python service launch and restart policy", CheckPythonServiceLaunchConfiguration),
             ("Connector release metadata", CheckConnectorReleaseMetadata),
@@ -286,6 +288,53 @@ internal static class Program
             "An unclassified HID device must keep physical-input coverage unhealthy.");
         Require(InputMonitorSafety.IsHealthy(true, true, true, false),
             "Validated monitor coverage with no unknown device should be healthy.");
+    }
+
+    private static void CheckPhysicalInputBridgeProtocol()
+    {
+        byte[] frame = PhysicalInputPipeProtocol.CreateFrame(7, true, false);
+        Require(frame.Length == PhysicalInputPipeProtocol.FrameSize,
+            "The physical-input frame has an unexpected size.");
+        Require(frame.AsSpan(0, 4).SequenceEqual("E2PI"u8),
+            "The physical-input frame magic is invalid.");
+        Require(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(4)) == 1,
+            "The physical-input frame version is invalid.");
+        Require(BinaryPrimitives.ReadUInt16LittleEndian(frame.AsSpan(6)) == 1,
+            "The available idle frame flags are invalid.");
+        Require(BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(8)) == frame.Length,
+            "The physical-input frame length field is invalid.");
+        Require(BinaryPrimitives.ReadUInt64LittleEndian(frame.AsSpan(12)) == 7,
+            "The physical-input frame sequence is invalid.");
+
+        byte[] unavailable = PhysicalInputPipeProtocol.CreateFrame(8, false, false);
+        Require(BinaryPrimitives.ReadUInt16LittleEndian(unavailable.AsSpan(6)) == 2,
+            "An unavailable input source must be reported fail-closed.");
+
+        var keys = new RawKeyboardState();
+        keys.SetKey((nint)1, 0x41, true);
+        keys.SetKey((nint)2, 0x41, true);
+        keys.SetKey((nint)1, 0x41, false);
+        Require(keys.IsActive, "Releasing one device must not clear another device's held key.");
+        keys.RemoveDevice((nint)2);
+        Require(!keys.IsActive, "Removing a keyboard must clear its held keys.");
+
+        var mice = new RawMouseButtonState();
+        mice.Apply((nint)1, 0x0001);
+        mice.Apply((nint)2, 0x0001);
+        mice.Apply((nint)1, 0x0002);
+        Require(mice.IsActive, "Releasing one mouse must not clear another device's held button.");
+        mice.RemoveDevice((nint)2);
+        Require(!mice.IsActive, "Removing a mouse must clear its held buttons.");
+    }
+
+    private static void CheckWindowsCanonicalPeerPaths()
+    {
+        string imagePath = typeof(Program).Assembly.Location;
+        string? physicalInputPath = PhysicalInputPipeClient.CanonicalPathOrNull(imagePath);
+        Require(!string.IsNullOrWhiteSpace(physicalInputPath),
+            "The physical-input peer image path must be canonicalizable on the workspace volume.");
+        Require(UiPipeClient.CanonicalPath(imagePath) == physicalInputPath,
+            "WPF named-pipe clients must use the same canonical path representation.");
     }
 
     private static void CheckPythonServiceLaunchConfiguration()

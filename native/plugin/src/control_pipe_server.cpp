@@ -1,6 +1,7 @@
-// Edited by: OpenAI-Codex_Responsible: Source_Code
+// Edited by: OpenAI-Codex (OpenAI-Codex_Responsible: Source_Code)
 #include "ets2ap/plugin/control_pipe_server.h"
 #include "ets2ap/plugin/input_plugin.h"
+#include "ets2ap/plugin/physical_input_pipe_server.h"
 #include "ets2ap/plugin/telemetry_plugin.h"
 
 #include <Windows.h>
@@ -26,6 +27,8 @@ constexpr DWORD kFirstReadMs = 50;
 constexpr DWORD kFrameDeadlineMs = 100;
 constexpr DWORD kStatusIntervalMs = 50;
 constexpr DWORD kStatusWriteDeadlineMs = 20;
+constexpr DWORD kPhysicalInputFrameDeadlineMs = 300;
+constexpr DWORD kCanonicalVolumeNameNt = 0x00000002U;
 constexpr DWORD kProcessQueryLimitedInformation = 0x1000;
 constexpr DWORD kTokenQuery = 0x0008;
 constexpr TOKEN_INFORMATION_CLASS kTokenUserClass = TokenUser;
@@ -51,7 +54,7 @@ std::wstring CanonicalImagePath(const std::wstring& path) {
     if (file == INVALID_HANDLE_VALUE) return {};
     std::array<wchar_t, 32768> buffer{};
     const DWORD length = GetFinalPathNameByHandleW(file, buffer.data(),
-                                                   static_cast<DWORD>(buffer.size()), 0);
+        static_cast<DWORD>(buffer.size()), kCanonicalVolumeNameNt);
     CloseHandle(file);
     if (length == 0 || length >= buffer.size()) return {};
     std::wstring result(buffer.data(), length);
@@ -96,11 +99,35 @@ std::wstring CurrentUserSidString() {
     return result;
 }
 
-bool VerifyClient(HANDLE pipe, const std::wstring& trusted_image) noexcept {
+bool VerifyClient(HANDLE pipe, const std::wstring& trusted_image,
+                  DWORD* failure_error = nullptr) noexcept {
+    if (failure_error) *failure_error = ERROR_ACCESS_DENIED;
     ULONG pid = 0;
-    if (!GetNamedPipeClientProcessId(pipe, &pid) || pid == 0) return false;
+    if (!GetNamedPipeClientProcessId(pipe, &pid) || pid == 0) {
+        if (failure_error) *failure_error = GetLastError();
+        return false;
+    }
+    if (pid == GetCurrentProcessId()) {
+        std::array<wchar_t, 32768> path{};
+        const DWORD path_length = GetModuleFileNameW(nullptr, path.data(),
+            static_cast<DWORD>(path.size()));
+        if (path_length == 0 || path_length >= path.size()) {
+            if (failure_error) *failure_error = GetLastError();
+            return false;
+        }
+        const std::wstring client_image = CanonicalImagePath(
+            std::wstring(path.data(), path_length));
+        const bool matches = !client_image.empty() && client_image == trusted_image;
+        if (failure_error) *failure_error = matches ? ERROR_SUCCESS :
+            (client_image.empty() ? ERROR_ACCESS_DENIED : ERROR_BAD_EXE_FORMAT);
+        return matches;
+    }
+
     HANDLE process = OpenProcess(kProcessQueryLimitedInformation, FALSE, pid);
-    if (!process) return false;
+    if (!process) {
+        if (failure_error) *failure_error = GetLastError();
+        return false;
+    }
 
     bool valid = false;
     HANDLE process_token = nullptr;
@@ -108,13 +135,22 @@ bool VerifyClient(HANDLE pipe, const std::wstring& trusted_image) noexcept {
     try {
         std::array<wchar_t, 32768> path{};
         DWORD path_length = static_cast<DWORD>(path.size());
-        if (!QueryFullProcessImageNameW(process, 0, path.data(), &path_length) ||
-            CanonicalImagePath(std::wstring(path.data(), path_length)) != trusted_image) {
+        if (!QueryFullProcessImageNameW(process, 0, path.data(), &path_length)) {
+            if (failure_error) *failure_error = GetLastError();
+            CloseHandle(process);
+            return false;
+        }
+        const std::wstring client_image = CanonicalImagePath(
+            std::wstring(path.data(), path_length));
+        if (client_image.empty() || client_image != trusted_image) {
+            if (failure_error) *failure_error = client_image.empty()
+                ? ERROR_ACCESS_DENIED : ERROR_BAD_EXE_FORMAT;
             CloseHandle(process);
             return false;
         }
         if (!CurrentUserToken(process, process_token) ||
             !CurrentUserToken(GetCurrentProcess(), current_token)) {
+            if (failure_error) *failure_error = GetLastError();
             CloseHandle(process);
             if (process_token) CloseHandle(process_token);
             if (current_token) CloseHandle(current_token);
@@ -127,6 +163,7 @@ bool VerifyClient(HANDLE pipe, const std::wstring& trusted_image) noexcept {
         valid = ReadTokenUser(process_token, process_storage, process_user) &&
                 ReadTokenUser(current_token, current_storage, current_user) &&
                 EqualSid(process_user->User.Sid, current_user->User.Sid) != FALSE;
+        if (valid && failure_error) *failure_error = ERROR_SUCCESS;
     } catch (...) {
         valid = false;
     }
@@ -443,6 +480,20 @@ std::wstring TrustedControlClientImageFromInstallRegistry() {
     return path.wstring();
 }
 
+std::wstring TrustedPhysicalInputClientImageFromInstallRegistry() {
+    DWORD byte_count = 0;
+    const auto flags = RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, kInstallRegistryKey, kInstallRegistryValue,
+                     flags, nullptr, nullptr, &byte_count) != ERROR_SUCCESS ||
+        byte_count < sizeof(wchar_t)) return {};
+    std::vector<wchar_t> value(byte_count / sizeof(wchar_t) + 1, L'\0');
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, kInstallRegistryKey, kInstallRegistryValue,
+                     flags, nullptr, value.data(), &byte_count) != ERROR_SUCCESS) return {};
+    std::filesystem::path path(value.data());
+    path /= L"ETS2AP.Ui.exe";
+    return path.wstring();
+}
+
 ControlPipeServer& GlobalControlPipeServer() noexcept {
     static ControlPipeServer server{GlobalControlHost(), [] {
         ControlPipeServerOptions options{};
@@ -454,6 +505,9 @@ ControlPipeServer& GlobalControlPipeServer() noexcept {
             const auto telemetry = GlobalTelemetryPlugin().ControlSnapshot(*now);
             gates.telemetry_fresh = telemetry.fresh;
             gates.speed_limit_available = telemetry.speed_limit_available;
+            const auto input_status = GlobalControlHost().GetPhysicalInputStatus();
+            gates.input_monitor_healthy = input_status.healthy;
+            gates.manual_input_active = input_status.manual_input_active;
             // The WPF authorization path is not connected to native/input yet.
             gates.explicit_ui_authorized = false;
             gates.maximum_steering_ratio = 0.30;
@@ -461,6 +515,159 @@ ControlPipeServer& GlobalControlPipeServer() noexcept {
         };
         return options;
     }()};
+    return server;
+}
+
+PhysicalInputPipeServer::PhysicalInputPipeServer(
+    PhysicalInputPipeServerOptions options, KeyboardInputReportState& state)
+    : options_(std::move(options)), state_(state) {}
+
+PhysicalInputPipeServer::~PhysicalInputPipeServer() {
+    Stop();
+}
+
+bool PhysicalInputPipeServer::Start() noexcept {
+    std::unique_lock<std::mutex> lifecycle_lock(lifecycle_mutex_, std::defer_lock);
+    try {
+        lifecycle_lock.lock();
+        if (running_.load(std::memory_order_acquire)) return true;
+        last_error_.store(ERROR_SUCCESS, std::memory_order_release);
+        state_.Disconnect();
+        canonical_client_image_ = CanonicalImagePath(options_.trusted_client_image);
+        if (canonical_client_image_.empty()) {
+            last_error_.store(GetLastError(), std::memory_order_release);
+            return false;
+        }
+        running_.store(true, std::memory_order_release);
+        worker_ = std::jthread([this](std::stop_token token) { Run(token); });
+        return true;
+    } catch (...) {
+        if (!lifecycle_lock.owns_lock()) {
+            try { lifecycle_lock.lock(); }
+            catch (...) { return false; }
+        }
+        last_error_.store(ERROR_NOT_ENOUGH_MEMORY, std::memory_order_release);
+        running_.store(false, std::memory_order_release);
+        state_.Disconnect();
+        return false;
+    }
+}
+
+void PhysicalInputPipeServer::Stop() noexcept {
+    std::unique_lock<std::mutex> lifecycle_lock(lifecycle_mutex_, std::defer_lock);
+    try {
+        lifecycle_lock.lock();
+        if (worker_.joinable()) {
+            worker_.request_stop();
+            worker_.join();
+        }
+        running_.store(false, std::memory_order_release);
+        listening_.store(false, std::memory_order_release);
+        state_.Disconnect();
+    } catch (...) {
+        if (!lifecycle_lock.owns_lock()) {
+            try { lifecycle_lock.lock(); }
+            catch (...) { return; }
+        }
+        try {
+            if (worker_.joinable()) {
+                worker_.request_stop();
+                worker_.join();
+            }
+        } catch (...) {
+        }
+        running_.store(false, std::memory_order_release);
+        listening_.store(false, std::memory_order_release);
+        state_.Disconnect();
+    }
+}
+
+bool PhysicalInputPipeServer::IsRunning() const noexcept {
+    return running_.load(std::memory_order_acquire);
+}
+
+bool PhysicalInputPipeServer::IsListening() const noexcept {
+    return listening_.load(std::memory_order_acquire);
+}
+
+std::uint32_t PhysicalInputPipeServer::LastError() const noexcept {
+    return last_error_.load(std::memory_order_acquire);
+}
+
+void PhysicalInputPipeServer::Run(std::stop_token stop_token) noexcept {
+    const std::wstring sid = CurrentUserSidString();
+    if (sid.empty()) {
+        last_error_.store(ERROR_ACCESS_DENIED, std::memory_order_release);
+        running_.store(false, std::memory_order_release);
+        state_.Disconnect();
+        return;
+    }
+    const std::wstring sddl = L"D:P(A;;GA;;;" + sid + L")";
+    PSECURITY_DESCRIPTOR descriptor = nullptr;
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1,
+                                                               &descriptor, nullptr)) {
+        last_error_.store(GetLastError(), std::memory_order_release);
+        running_.store(false, std::memory_order_release);
+        state_.Disconnect();
+        return;
+    }
+    SECURITY_ATTRIBUTES security{sizeof(SECURITY_ATTRIBUTES), descriptor, FALSE};
+
+    while (!stop_token.stop_requested()) {
+        HANDLE pipe = CreateNamedPipeW(options_.pipe_name.c_str(),
+            PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+            1, 0, static_cast<DWORD>(kKeyboardInputFrameSize), 0, &security);
+        if (pipe == INVALID_HANDLE_VALUE) {
+            last_error_.store(GetLastError(), std::memory_order_release);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+        listening_.store(true, std::memory_order_release);
+        if (ConnectClient(pipe, stop_token, last_error_)) {
+            DWORD verification_error = ERROR_ACCESS_DENIED;
+            if (VerifyClient(pipe, canonical_client_image_, &verification_error)) {
+                state_.BeginConnection();
+                (void)ServeClient(pipe, stop_token);
+            } else {
+                last_error_.store(verification_error, std::memory_order_release);
+            }
+        }
+        state_.Disconnect();
+        listening_.store(false, std::memory_order_release);
+        DisconnectNamedPipe(pipe);
+        CloseHandle(pipe);
+    }
+
+    LocalFree(descriptor);
+    running_.store(false, std::memory_order_release);
+    state_.Disconnect();
+}
+
+bool PhysicalInputPipeServer::ServeClient(void* raw_pipe,
+                                          std::stop_token stop_token) noexcept {
+    HANDLE pipe = static_cast<HANDLE>(raw_pipe);
+    std::uint64_t previous_sequence = 0;
+    while (!stop_token.stop_requested()) {
+        std::array<std::byte, kKeyboardInputFrameSize> frame{};
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds{kPhysicalInputFrameDeadlineMs};
+        if (ReadExact(pipe, frame, deadline, stop_token) != IoResult::Complete) return false;
+        KeyboardInputReport report{};
+        if (!DecodeKeyboardInputFrame(frame, previous_sequence, report)) return false;
+        const auto received_at = std::chrono::steady_clock::now();
+        if (!state_.Update(report, received_at)) return false;
+        previous_sequence = report.sequence;
+    }
+    return false;
+}
+
+PhysicalInputPipeServer& GlobalPhysicalInputPipeServer() noexcept {
+    static PhysicalInputPipeServer server{[] {
+        PhysicalInputPipeServerOptions options{};
+        options.trusted_client_image = TrustedPhysicalInputClientImageFromInstallRegistry();
+        return options;
+    }(), GlobalKeyboardInputReportState()};
     return server;
 }
 

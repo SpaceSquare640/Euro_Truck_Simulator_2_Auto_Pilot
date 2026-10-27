@@ -5,6 +5,8 @@ All notable changes to this project are documented here and published on the pro
 ## [Unreleased]
 
 ### Added
+- Added Physical Input v1: WPF tracks keyboard and mouse held state per device across focus changes, then sends sequenced Raw Input frames to a native pipe that authenticates the UI process and same-user SID, expires reports after 250 ms, and fails closed on invalid data or disconnect; physical-device coverage remains unvalidated and engagement stays blocked. (OpenAI-Codex_Responsible: Source_Code)
+- Added a native keyboard and XInput manual-input monitor on the ControlHost scheduler with an injectable test seam; unknown HID devices and unvalidated device coverage keep the safety gate unhealthy. (OpenAI-Codex; OpenAI-Codex_Responsible: Source_Code)
 - Added a Windows GitHub Actions smoke test for connector installation, backup, idempotence, and rollback in a synthetic ETS2 folder. (OpenAI-Codex_Responsible: Source_Code)
 - UI IPC v1.2 Control.v1 connection and native state diagnostics in the Overview; v1.0 and v1.1 remain supported, and engagement stays disabled. (OpenAI-Codex_Responsible: Source_Code)
 - Connected the Python service to DriverAssistRuntime and the native Control.v1 status pipe when a saved ETS2 executable path is available; engagement remains denied and only neutral/disengaged commands are sent. (OpenAI-Codex_Responsible: Source_Code)
@@ -15,6 +17,9 @@ All notable changes to this project are documented here and published on the pro
 - Added Control.v1.1 safety-claim packets and server capability negotiation; the client will not engage with a legacy server, and native engagement stays blocked while its local input-monitor gate is unavailable. (OpenAI-Codex_Responsible: Source_Code)
 
 ### Changed
+- Native and WPF named-pipe peer-image checks now canonicalize with the normalized NT volume path, which remains available when DOS volume-name lookup is denied; exact image-path and same-user SID checks remain required. (OpenAI-Codex_Responsible: Source_Code)
+- The Physical Input pipe retains a current-user-only ACL and rejects remote clients; exact peer image and same-user SID authentication remain required. (OpenAI-Codex_Responsible: Source_Code)
+- The native keyboard monitor now treats a zero-only `GetAsyncKeyState` scan as indeterminate and fail-closed; only an observed high-order key-down bit establishes current keyboard activity. (OpenAI-Codex_Responsible: Source_Code)
 - Updated the Control.v1 cross-process smoke client to send required v1.1 safety claims so the native test exercises server-side fail-closed gates. (OpenAI-Codex_Responsible: Source_Code)
 - Decoupled the neutral Control.v1 heartbeat from status reads and capped it at a 50 ms interval to prevent status updates from driving command traffic. (OpenAI-Codex_Responsible: Source_Code)
 - Native UI authorization now fails closed; WPF input-monitor health remains unavailable until physical-device coverage is validated. Corrected Raw Input mouse-button release tracking. (OpenAI-Codex_Responsible: Source_Code)

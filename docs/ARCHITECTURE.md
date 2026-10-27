@@ -30,6 +30,7 @@ flowchart LR
 | [telemetry v1](../shared/ipc/telemetry.v1.md) | Shared memory | plugin → python | 4096-byte mapping, 240-byte v1.0 struct, SI units, version header, sequence counter |
 | [gameframe v1](../shared/ipc/gameframe.v1.md) | Shared memory | plugin → ui | Internal D3D11 Present capture; WPF reads only and retains GDI fallback |
 | [perception v1](../shared/ipc/perception.v1.md) | Shared memory | ui → python | 43,264-byte mapping with a 64-byte seqlock header and 160 × 90 RGB24 image; WPF bridges gameframe or GDI capture; prototype detections do not authorize control |
+| [physical input v1](../shared/ipc/physical-input.v1.md) | Named pipe | ui → native/input | 24-byte Raw Input state frames at 20 Hz; native receive-time expiry fails closed after 250 ms |
 | [control v1](../shared/ipc/control.v1.md) | Named pipe | python → input commands; input → python status | Overlapped I/O; 64-byte v1.0 command prefix, v1.1 safety-claim extension, 64-byte v1.0 status prefix and v1.1 capability extension |
 | [ui v1](../shared/ipc/ui.v1.md) | Named pipe | python ↔ ui | JSON status with state_revision; v1.1 adds optional perception observations; [JSON Schema](../shared/ipc/ui.v1.schema.json) |
 

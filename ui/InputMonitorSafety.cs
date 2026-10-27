@@ -27,3 +27,36 @@ internal static class InputMonitorSafety
         rawInputRegistered && xinputAvailable && physicalDeviceCoverageValidated &&
         !unclassifiedHidObserved;
 }
+
+internal sealed class RawKeyboardState
+{
+    private readonly HashSet<(nint Device, int Key)> _pressedKeys = new();
+
+    internal bool IsActive => _pressedKeys.Count != 0;
+
+    internal void SetKey(nint device, int key, bool isDown)
+    {
+        if (isDown) _pressedKeys.Add((device, key));
+        else _pressedKeys.Remove((device, key));
+    }
+
+    internal void RemoveDevice(nint device) =>
+        _pressedKeys.RemoveWhere(pressed => pressed.Device == device);
+}
+
+internal sealed class RawMouseButtonState
+{
+    private readonly Dictionary<nint, uint> _heldButtons = new();
+
+    internal bool IsActive => _heldButtons.Count != 0;
+
+    internal void Apply(nint device, uint flags)
+    {
+        uint heldButtons = _heldButtons.TryGetValue(device, out uint current) ? current : 0;
+        heldButtons = InputMonitorSafety.ApplyMouseButtonFlags(heldButtons, flags);
+        if (heldButtons == 0) _heldButtons.Remove(device);
+        else _heldButtons[device] = heldButtons;
+    }
+
+    internal void RemoveDevice(nint device) => _heldButtons.Remove(device);
+}

@@ -26,21 +26,23 @@ internal sealed class PerceptionCaptureService : IDisposable
     private readonly Window _window;
     private readonly DispatcherTimer _timer;
     private readonly PerceptionFramePublisher _publisher;
+    private readonly PhysicalInputPipeClient _inputPipe;
     private readonly GameFrameReader _gameFrameReader = new();
-    private readonly HashSet<int> _pressedKeys = new();
+    private readonly RawKeyboardState _pressedKeys = new();
+    private readonly RawMouseButtonState _mouseButtons = new();
     private readonly Dictionary<nint, byte[]> _hidBaselines = new();
     private HwndSource? _source;
     private ulong _manualUntilNs;
-    private uint _mouseButtons;
     private bool _rawInputHealthy;
     private bool _xinputHealthy;
     private bool _unclassifiedHidObserved;
     private bool _disposed;
 
-    internal PerceptionCaptureService(Window window)
+    internal PerceptionCaptureService(Window window, string? trustedControlServerImage)
     {
         _window = window;
         _publisher = new PerceptionFramePublisher();
+        _inputPipe = new PhysicalInputPipeClient(trustedControlServerImage);
         _timer = new DispatcherTimer(DispatcherPriority.Background, window.Dispatcher)
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -51,6 +53,7 @@ internal sealed class PerceptionCaptureService : IDisposable
     internal void Start()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(PerceptionCaptureService));
+        _inputPipe.Start();
         _source = HwndSource.FromHwnd(new WindowInteropHelper(_window).Handle);
         if (_source is null) return;
         _source.AddHook(WindowHook);
@@ -83,8 +86,8 @@ internal sealed class PerceptionCaptureService : IDisposable
         bool frameValid = focused && gameWindow != 0 &&
             (_gameFrameReader.TryRead(rgb, now) || TryCapture(gameWindow, rgb));
         bool xinputActive = focused && PollXInput(now);
-        bool manual = _pressedKeys.Count > 0 || _mouseButtons != 0 ||
-                      now < _manualUntilNs || xinputActive;
+        bool manual = focused && (_pressedKeys.IsActive || _mouseButtons.IsActive ||
+                      now < _manualUntilNs || xinputActive);
 
         PerceptionFrameFlags flags = PerceptionFrameFlags.None;
         if (focused) flags |= PerceptionFrameFlags.GameFocused;
@@ -93,6 +96,7 @@ internal sealed class PerceptionCaptureService : IDisposable
             flags |= PerceptionFrameFlags.InputMonitorHealthy;
         if (manual) flags |= PerceptionFrameFlags.ManualInputActive;
         if (frameValid) flags |= PerceptionFrameFlags.FrameValid;
+        _inputPipe.Publish(_rawInputHealthy, manual);
         try { _publisher.Publish(rgb, now, flags); }
         catch (Exception error) when (error is IOException or ObjectDisposedException or
             UnauthorizedAccessException or ArgumentException or OverflowException)
@@ -105,13 +109,17 @@ internal sealed class PerceptionCaptureService : IDisposable
     {
         if (message == WmInput) ObserveRawInput(lParam);
         else if (message == WmInputDeviceChange && wParam == GidcRemoval)
+        {
+            _pressedKeys.RemoveDevice(lParam);
+            _mouseButtons.RemoveDevice(lParam);
             _hidBaselines.Remove(lParam);
+        }
         return nint.Zero;
     }
 
     private void ObserveRawInput(nint rawInput)
     {
-        if (!IsGameForeground()) return;
+        bool gameForeground = IsGameForeground();
         uint size = 0;
         uint headerSize = (uint)Marshal.SizeOf<RawInputHeader>();
         _ = GetRawInputData(rawInput, RidInput, nint.Zero, ref size, headerSize);
@@ -127,20 +135,21 @@ internal sealed class PerceptionCaptureService : IDisposable
             {
                 int message = Marshal.ReadInt32(storage, (int)headerSize + 8);
                 int key = Marshal.ReadInt16(storage, (int)headerSize + 6);
-                if (message is WmKeyDown or WmSysKeyDown) _pressedKeys.Add(key);
-                else if (message is WmKeyUp or WmSysKeyUp) _pressedKeys.Remove(key);
-                if (message is WmKeyDown or WmSysKeyDown) _manualUntilNs = now + 250_000_000UL;
+                bool keyDown = message is WmKeyDown or WmSysKeyDown;
+                bool keyUp = message is WmKeyUp or WmSysKeyUp;
+                if (keyDown || keyUp) _pressedKeys.SetKey(device, key, keyDown);
+                if (gameForeground && keyDown) _manualUntilNs = now + 250_000_000UL;
             }
             else if (type == 0)
             {
                 uint buttonFlags = unchecked((uint)Marshal.ReadInt16(storage, (int)headerSize + 4));
                 int deltaX = Marshal.ReadInt32(storage, (int)headerSize + 12);
                 int deltaY = Marshal.ReadInt32(storage, (int)headerSize + 16);
-                UpdateMouseButtons(buttonFlags);
-                if (buttonFlags != 0 || deltaX != 0 || deltaY != 0)
+                UpdateMouseButtons(device, buttonFlags);
+                if (gameForeground && (buttonFlags != 0 || deltaX != 0 || deltaY != 0))
                     _manualUntilNs = now + 250_000_000UL;
             }
-            else if (type == HidReportType)
+            else if (gameForeground && type == HidReportType)
             {
                 _unclassifiedHidObserved = true;
                 uint reportSize = unchecked((uint)Marshal.ReadInt32(storage, (int)headerSize));
@@ -163,9 +172,9 @@ internal sealed class PerceptionCaptureService : IDisposable
         finally { Marshal.FreeHGlobal(storage); }
     }
 
-    private void UpdateMouseButtons(uint flags)
+    private void UpdateMouseButtons(nint device, uint flags)
     {
-        _mouseButtons = InputMonitorSafety.ApplyMouseButtonFlags(_mouseButtons, flags);
+        _mouseButtons.Apply(device, flags);
     }
 
     private bool PollXInput(ulong now)
@@ -293,6 +302,7 @@ internal sealed class PerceptionCaptureService : IDisposable
         _timer.Stop();
         _timer.Tick -= Tick;
         if (_source is not null) _source.RemoveHook(WindowHook);
+        _inputPipe.Dispose();
         _gameFrameReader.Dispose();
         _publisher.Dispose();
     }

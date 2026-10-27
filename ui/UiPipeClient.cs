@@ -83,13 +83,13 @@ internal sealed class UiPipeClient
         }
     }
 
-    private static string CanonicalPath(string path)
+    internal static string CanonicalPath(string path)
     {
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
             FileShare.ReadWrite | FileShare.Delete);
         var buffer = new char[32768];
         uint length = GetFinalPathNameByHandleW(stream.SafeFileHandle.DangerousGetHandle(), buffer,
-            (uint)buffer.Length, 0);
+            (uint)buffer.Length, 0x00000002);
         if (length == 0 || length >= buffer.Length) throw new IOException("Cannot resolve executable path.");
         return new string(buffer, 0, (int)length).ToUpperInvariant();
     }

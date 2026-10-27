@@ -4,6 +4,7 @@
 #include "ets2ap/plugin/control_host.h"
 #include "ets2ap/plugin/control_pipe_server.h"
 #include "ets2ap/plugin/gameframe_capture.h"
+#include "ets2ap/plugin/physical_input_pipe_server.h"
 
 SCSAPI_RESULT scs_telemetry_init(const scs_u32_t version,
                                 const scs_telemetry_init_params_t* const params) {
@@ -36,9 +37,11 @@ SCSAPI_RESULT scs_input_init(const scs_u32_t version, const scs_input_init_param
             input_plugin.Shutdown();
             return SCS_RESULT_generic_error;
         }
+        (void)ets2ap::plugin::GlobalPhysicalInputPipeServer().Start();
         (void)ets2ap::plugin::GlobalControlPipeServer().Start();
         return SCS_RESULT_ok;
     } catch (...) {
+        ets2ap::plugin::GlobalPhysicalInputPipeServer().Stop();
         ets2ap::plugin::GlobalControlPipeServer().Stop();
         ets2ap::plugin::GlobalControlHost().Stop();
         ets2ap::plugin::GlobalInputPlugin().Shutdown();
@@ -47,6 +50,7 @@ SCSAPI_RESULT scs_input_init(const scs_u32_t version, const scs_input_init_param
 }
 
 SCSAPI_VOID scs_input_shutdown(void) {
+    ets2ap::plugin::GlobalPhysicalInputPipeServer().Stop();
     ets2ap::plugin::GlobalControlPipeServer().Stop();
     ets2ap::plugin::GlobalControlHost().Stop();
     ets2ap::plugin::GlobalInputPlugin().Shutdown();

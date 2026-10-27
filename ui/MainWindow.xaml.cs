@@ -129,7 +129,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            _perceptionCapture = new PerceptionCaptureService(this);
+            _perceptionCapture = new PerceptionCaptureService(this, TrustedControlServerImage());
             _perceptionCapture.Start();
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or

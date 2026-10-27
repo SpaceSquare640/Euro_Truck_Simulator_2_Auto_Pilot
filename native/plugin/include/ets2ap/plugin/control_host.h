@@ -1,7 +1,8 @@
-// Edited by: OpenAI-Codex_Responsible: Source_Code
+// Edited by: OpenAI-Codex (OpenAI-Codex_Responsible: Source_Code)
 #pragma once
 
 #include "ets2ap/input/control_core.h"
+#include "ets2ap/plugin/physical_input_monitor.h"
 
 #include <array>
 #include <atomic>
@@ -21,6 +22,7 @@ struct ControlHostOptions {
     std::function<std::optional<std::uint64_t>()> now_ns{};
     std::function<bool(const input::ControlSnapshot&, std::uint64_t)> apply_output{};
     std::function<void()> force_neutral{};
+    std::function<PhysicalInputStatus()> sample_physical_input{};
     std::chrono::milliseconds tick_interval{10};
 };
 
@@ -34,6 +36,7 @@ public:
     bool Start() noexcept;
     void Stop() noexcept;
     bool IsRunning() const noexcept;
+    PhysicalInputStatus GetPhysicalInputStatus() noexcept;
     bool Connect() noexcept;
     input::CommandResult AcceptCommand(std::span<const std::byte> packet,
                                        const input::SafetyGates& gates = {}) noexcept;
@@ -45,6 +48,7 @@ public:
 private:
     void Run(std::stop_token stop_token) noexcept;
     void TickAndPublish() noexcept;
+    void RefreshPhysicalInputLocked() noexcept;
     std::optional<std::uint64_t> ReadNowNsLocked() noexcept;
     bool PublishLocked(std::uint64_t now_ns) noexcept;
     void ForceNeutralLocked() noexcept;
@@ -53,6 +57,7 @@ private:
     mutable std::mutex lifecycle_mutex_{};
     std::mutex operation_mutex_{};
     input::ControlCore core_{};
+    PhysicalInputStatus physical_input_status_{};
     std::jthread worker_{};
     std::atomic<bool> running_{false};
 };
